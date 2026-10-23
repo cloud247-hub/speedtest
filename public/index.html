@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#061a2f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nettfart">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="Nettfart fra Cloud247: test hvor raskt nettet ditt er, og få konkrete forslag til hva du kan gjøre når det går tregt.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<title>Nettfart | Cloud247</title>
+<style>
+/* Cloud247 profile (same as cloud247.no and the other Cloud Toolbox tools): navy/yellow palette, Inter/system type,
+   navy header + hero, numbered white panels, a navy card for the live value, navy footer with the version. */
+:root{--navy:#061a2f;--navy2:#0a2745;--yellow:#fad63a;--yellow2:#f1c400;--yellow-soft:#fff9df;--sky:#7cc4fa;
+  --ink:#172033;--muted:#667085;--line:#e4e8ee;--bg:#f6f8fa;--surface:#fff;--success:#157347;--danger:#b42318;
+  --radius:22px;--shadow:0 18px 55px rgba(6,26,47,.10);
+  --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --top:env(safe-area-inset-top,0px);--bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html{background:var(--navy);scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;overflow-x:clip}
+button,input{font:inherit}
+button,a,input{-webkit-tap-highlight-color:transparent}
+button{cursor:pointer}
+a{color:inherit}
+[hidden]{display:none!important}
+.shell{width:min(1160px,calc(100% - 48px));margin-inline:auto}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #b18c00;outline-offset:4px}
+/* locked viewport on touch only (no pinch / double-tap zoom); desktop keeps normal scrolling */
+@media (pointer:coarse){
+  html,body{overscroll-behavior:none;touch-action:pan-y}
+  body{-webkit-user-select:none;user-select:none}
+  input{-webkit-user-select:text;user-select:text}
+  button,a,label{touch-action:manipulation}
+}
+
+/* ---- header ---- */
+.site-header{background:var(--navy);border-bottom:1px solid rgba(255,255,255,.08);padding-top:var(--top)}
+.site-header .header-inner{width:min(1160px,calc(100% - 40px));margin:0 auto;min-height:84px;display:flex;align-items:center;justify-content:space-between;gap:24px;position:relative}
+.cloud-brand{display:block;width:230px;flex:0 0 auto}
+.cloud-brand img{display:block;width:100%;height:auto}
+.header-account{display:flex;align-items:center;gap:12px}
+.header-label{color:#c5d0db;font-size:.92rem;font-weight:700;letter-spacing:.02em}
+.language-switcher{display:inline-flex;align-items:center;padding:3px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);border-radius:10px}
+.language-switcher button{min-width:36px;height:30px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:#bfcbd7;font-size:.72rem;font-weight:900;letter-spacing:.04em}
+.language-switcher button:hover{color:#fff;background:rgba(255,255,255,.08)}
+.language-switcher button.is-active{background:var(--yellow);color:var(--navy)}
+.language-switcher button:focus-visible,.cloud-brand:focus-visible{outline:3px solid var(--yellow);outline-offset:4px}
+@media(max-width:760px){.header-account{position:absolute;right:0;gap:7px;z-index:1}.header-label{display:none}.language-switcher button{min-width:32px;height:28px;padding:0 6px}}
+@media(max-width:420px){.language-switcher button{min-width:29px;padding:0 5px;font-size:.68rem}}
+@media(max-width:620px){.site-header .header-inner{width:calc(100% - 28px);min-height:72px;justify-content:center}.cloud-brand{width:180px}}
+
+/* ---- hero ---- */
+.hero{overflow:hidden;background:radial-gradient(ellipse at 85% 40%,rgba(250,214,58,.075),transparent 40%),linear-gradient(180deg,var(--navy),#071f38);color:#fff}
+.hero-inner{display:flex;justify-content:space-between;align-items:center;gap:50px;padding-block:53px 58px}
+.hero-copy{max-width:760px}
+.eyebrow,.kicker{margin:0 0 10px;font-size:.69rem;font-weight:850;letter-spacing:.16em}
+.eyebrow{color:var(--yellow)}
+.eyebrow>span[aria-hidden]{padding-inline:10px;color:#50616f}
+.kicker{color:#816500}
+.hero h1{margin:0;font-size:clamp(2.75rem,5.2vw,4.55rem);line-height:1.03;letter-spacing:-.052em;font-weight:820}
+.hero h1 .secondary{font-weight:450}
+.hero-description{font-size:1.08rem;color:#c8d2dc;max-width:650px;margin:22px 0}
+.hero-tags{display:flex;align-items:center;flex-wrap:wrap;gap:10px 22px;color:#b8c7d4;font-size:.73rem}
+.hero-tags>span{display:inline-flex;align-items:center;gap:7px}
+.hero-tags>span:not(:first-child):before{content:"";height:3px;width:3px;border-radius:100%;background:#697c8e}
+.tiny-dot{display:inline-block;width:6px;height:6px;flex-shrink:0;background:#54c896;border-radius:50%}
+.hero-art{width:208px;height:208px;flex:0 0 208px;position:relative;display:grid;place-items:center}
+.orbit{position:absolute;inset:0;border:1px solid rgba(250,214,58,.10);border-radius:50%}
+.orbit-two{inset:23px;border-color:rgba(250,214,58,.12)}
+.emblem{width:115px;height:115px;background:rgba(250,214,58,.07);border:1px solid rgba(250,214,58,.25);border-radius:30px;display:grid;place-items:center;transform:rotate(-8deg);color:var(--yellow)}
+.emblem svg{width:62px;height:62px;transform:rotate(8deg)}
+.art-label{position:absolute;bottom:0;background:#152b3b;border:1px solid #354650;color:#d5dfd9;border-radius:8px;padding:8px 12px;font:700 9px/1.1 var(--mono);letter-spacing:.12em;display:flex;gap:8px;align-items:center;white-space:nowrap}
+
+/* ---- panels ---- */
+.test-section{padding:38px 0 36px}
+.test-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:24px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px;box-shadow:0 2px 0 rgba(6,26,47,.02);min-width:0}
+.panel-heading{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.panel-heading h2{margin:0;font-size:1.45rem;line-height:1.2;letter-spacing:-.04em}
+.panel-heading .kicker{margin:0 0 3px;font-size:.61rem}
+.step{width:38px;height:38px;flex:none;display:grid;place-items:center;background:var(--yellow);color:var(--navy);font-size:.92rem;font-weight:850;border-radius:11px}
+.badge{display:inline-flex;align-items:center;gap:6px;margin-left:auto;border-radius:7px;padding:5px 9px;font-size:.62rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.badge.grade{color:var(--yellow);background:var(--navy);border:1px solid var(--navy)}
+.field-help{color:var(--muted);font-size:.71rem;line-height:1.65;margin:14px 0 0}
+
+/* the live meter: a navy card like the password card on the other tools */
+.meter{border:1px solid #203a52;background:linear-gradient(145deg,#0a2745,#061a2f);border-radius:15px;color:#fff;padding:22px 20px 0;display:flex;flex-direction:column;align-items:center;gap:16px;overflow:hidden}
+.gauge{width:100%;max-width:360px;height:auto;display:block;overflow:visible}
+.gauge .track{fill:none;stroke:rgba(255,255,255,.09);stroke-width:16;stroke-linecap:round}
+.gauge .val{fill:none;stroke:var(--yellow);stroke-width:16;stroke-linecap:round;transition:stroke-dasharray .18s linear,stroke .3s}
+.gauge .knob{fill:var(--navy);stroke:var(--yellow);stroke-width:4;transition:cx .18s linear,cy .18s linear,stroke .3s}
+.meter.up .gauge .val,.meter.up .gauge .knob{stroke:var(--sky)}
+.gauge .tick{stroke:#8fa7bb;stroke-width:1.5;opacity:.45}
+.gauge .tlbl{fill:#8fa7bb;font:500 10.5px var(--mono);text-anchor:middle;dominant-baseline:middle}
+.gauge .num{fill:#fff;font-weight:820;font-size:64px;letter-spacing:-.05em;text-anchor:middle;font-variant-numeric:tabular-nums}
+.gauge .unit{fill:#8fa7bb;font:500 13px var(--mono);text-anchor:middle}
+.gauge .phase{fill:var(--yellow);font-size:10px;font-weight:850;letter-spacing:.16em;text-anchor:middle;text-transform:uppercase}
+.meter.up .gauge .phase{fill:var(--sky)}
+.runbar{width:100%;max-width:360px;height:5px;border-radius:12px;background:rgba(255,255,255,.1);overflow:hidden}
+.runbar i{display:block;height:100%;width:0;background:var(--yellow);border-radius:12px;transition:width .2s linear}
+.meter.up .runbar i{background:var(--sky)}
+.start{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;max-width:320px;min-height:52px;border-radius:11px;border:1px solid var(--yellow);background:var(--yellow);color:var(--navy);font-size:.95rem;font-weight:800;padding:11px 18px}
+.start:hover{background:#f7cd22}
+.start svg{width:18px;height:18px}
+.start.stop{background:transparent;border-color:rgba(255,255,255,.28);color:#fff}
+.start.stop:hover{background:rgba(255,255,255,.06)}
+.start:focus-visible{outline-color:var(--yellow)}
+.where{align-self:stretch;display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #294058;padding:12px 0 13px;margin:2px 0 0;color:#92aabe;font-size:.66rem;min-height:44px}
+.where>span:last-child{font-family:var(--mono);text-align:right;overflow-wrap:anywhere}
+
+/* numbers */
+.notice{border-left:3px solid var(--danger);background:#fff1ef;color:#8c2924;border-radius:0 9px 9px 0;padding:12px 15px;margin:0 0 16px;font-size:.84rem;overflow-wrap:anywhere}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:12px 13px 11px;min-width:0}
+.stat span{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.6rem;font-weight:850;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat span i{width:7px;height:7px;border-radius:50%;flex:none}
+.stat b{display:block;margin-top:4px;color:var(--navy);font-size:1.55rem;font-weight:820;letter-spacing:-.045em;line-height:1.15;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat b small{font:500 .7rem var(--mono);letter-spacing:0;color:var(--muted);margin-left:3px}
+.stat.main b{font-size:2rem}
+.ctx{border-top:1px solid var(--line);margin-top:22px;padding-top:20px}
+.ctx-label{display:block;font-size:.83rem;font-weight:700;margin-bottom:9px}
+.mode-tabs{display:grid;grid-template-columns:repeat(3,1fr);padding:4px;background:#eef1f5;border-radius:12px;gap:3px}
+.mode-tabs button{border:0;background:none;color:#5b6574;font-size:.84rem;font-weight:720;border-radius:9px;min-height:40px;padding:7px 9px}
+.mode-tabs button[aria-pressed=true]{background:#fff;color:var(--navy);box-shadow:0 1px 5px rgba(6,26,47,.09)}
+.mode-tabs button:hover{color:var(--navy)}
+.plan-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;font-size:.83rem;font-weight:700}
+.plan-row small{display:block;color:var(--muted);font-size:.69rem;font-weight:500}
+.number-unit{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.74rem;font-weight:500;flex:none}
+.number-unit input{width:92px;border:1px solid #ccd3dc;background:#fff;border-radius:9px;padding:8px 8px 8px 10px;font-size:1.04rem;font-weight:800;color:var(--navy)}
+.number-unit input::placeholder{color:#a3acb9;font-weight:500}
+.secondary-button{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;margin-top:20px;border-radius:11px;min-height:49px;font-size:.85rem;font-weight:780;padding:11px 15px;background:#fff;border:1px solid #b7c1cd;color:var(--navy)}
+.secondary-button:hover{background:#f5f7fa}
+
+/* ---- results ---- */
+.info-section{padding:10px 0 40px}
+.section-title{margin-bottom:22px}
+.section-title .kicker{margin-bottom:7px}
+.section-title h2{font-size:1.6rem;letter-spacing:-.045em;margin:0}
+.uses{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.use{display:flex;align-items:center;gap:12px;padding:15px 16px;border:1px solid var(--line);border-radius:15px;background:#fff;min-width:0}
+.use .nm{flex:1;min-width:0;font-size:.88rem;font-weight:720;letter-spacing:-.01em}
+.use .st{display:inline-flex;align-items:center;gap:6px;border-radius:7px;padding:4px 8px;font-size:.6rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;border:1px solid}
+.use .st:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.use.good .st{color:#28764f;background:#edf7f1;border-color:#d5e9dc}
+.use.ok .st{color:#695514;background:var(--yellow-soft);border-color:#e8d783}
+.use.bad .st{color:var(--danger);background:#fff1ef;border-color:#f4cbc5}
+
+.sugs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+.sug{padding:24px 24px 22px;border:1px solid var(--line);border-radius:var(--radius);background:#fff;display:flex;flex-direction:column;gap:8px;min-width:0}
+.sug.bad{border-color:#f4cbc5;box-shadow:0 0 0 1px #f4cbc5}
+.sug.warn{border-color:#efd982;box-shadow:0 0 0 1px #efd982}
+.sug.good{background:linear-gradient(180deg,#edf7f1,#fff 60%);border-color:#d5e9dc}
+.sug .tag{align-self:flex-start;display:inline-flex;align-items:center;border-radius:7px;padding:4px 8px;font-size:.6rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;border:1px solid}
+.sug.bad .tag{color:var(--danger);background:#fff1ef;border-color:#f4cbc5}
+.sug.warn .tag{color:#695514;background:var(--yellow-soft);border-color:#e8d783}
+.sug.fix .tag,.sug.tip .tag{color:var(--yellow);background:var(--navy);border-color:var(--navy)}
+.sug.good .tag{color:#28764f;background:#fff;border-color:#d5e9dc}
+.sug h3{margin:4px 0 0;font-size:1.12rem;line-height:1.25;letter-spacing:-.025em}
+.sug p{margin:0;color:var(--muted);font-size:.84rem;line-height:1.65}
+.sug ol{list-style:none;margin:8px 0 0;padding:0;counter-reset:s;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+.sug li{counter-increment:s;display:grid;grid-template-columns:24px 1fr;gap:10px;font-size:.84rem;line-height:1.6}
+.sug li:before{content:counter(s);width:24px;height:24px;display:grid;place-items:center;border-radius:7px;background:var(--yellow);color:var(--navy);font-size:.72rem;font-weight:850;margin-top:-1px}
+
+.hist-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.text-button{padding:5px 0;border:0;background:none;color:#556173;text-decoration:underline;text-underline-offset:3px;font-size:.74rem;white-space:nowrap}
+.hist{list-style:none;margin:0;padding:0}
+.hrow{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,auto);gap:18px;align-items:baseline;border-top:1px solid #e9edf1;padding:12px 4px;font-size:.8rem}
+.hrow:first-child{border-top:0;padding-top:0}
+.hrow .when{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .v{font:600 .82rem var(--mono);color:var(--navy);text-align:right;white-space:nowrap}
+.hrow .v small{font-weight:400;color:var(--muted);font-size:.68rem}
+
+.more-tools-section{padding-bottom:54px}
+.more-tools-card{display:flex;justify-content:space-between;align-items:center;gap:25px;padding:32px 36px;background:linear-gradient(135deg,var(--navy),var(--navy2));border-radius:var(--radius);color:#fff}
+.more-tools-card h2{font-size:1.75rem;letter-spacing:-.04em;margin:0}
+.more-tools-card p:last-child{font-size:.8rem;margin:8px 0 0;color:#b2c2d0}
+.tools-button{display:inline-flex;justify-content:space-between;align-items:center;gap:30px;min-height:48px;padding:12px 19px;background:var(--yellow);border-radius:11px;color:var(--navy);font-size:.8rem;font-weight:800;text-decoration:none;white-space:nowrap}
+.tools-button:hover{background:#f7cd22}
+
+footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
+.footer-inner{display:flex;justify-content:space-between;align-items:center;gap:20px;min-height:83px;font-size:.72rem}
+.footer-inner a{text-decoration:none}
+.footer-inner a:hover{color:var(--yellow)}
+.footer-version{font-size:.65rem;color:#8198ad}
+.footer-version span{margin-left:8px;padding:3px 6px;border:1px solid #2e4257;border-radius:5px}
+
+@media(max-width:1049px){
+  .hero-art{width:168px;height:168px;flex-basis:168px}
+  .hero h1{font-size:3.5rem}
+  .panel{padding:23px}
+  .uses{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:860px){.sugs{grid-template-columns:1fr}}
+@media(max-width:760px){
+  .shell{width:calc(100% - 32px)}
+  .hero-inner{padding-block:39px 40px}
+  .hero h1{font-size:clamp(2.1rem,8.5vw,3.6rem)}
+  .hero-art{display:none}
+  .hero-description{font-size:.95rem}
+  .hero-tags{font-size:.67rem;gap:9px 14px}
+  .test-section{padding-top:22px}
+  .test-grid{grid-template-columns:1fr;gap:18px}
+  .panel{padding:20px}
+  .meter{padding:18px 14px 0}
+  .stat{padding:10px 11px 9px}
+  .stat b{font-size:1.3rem}
+  .stat.main b{font-size:1.65rem}
+  .uses{grid-template-columns:1fr;gap:8px}
+  .use{padding:13px 14px}
+  .sug{padding:20px}
+  .section-title h2{font-size:1.4rem}
+  .more-tools-card{align-items:stretch;flex-direction:column;padding:26px}
+  .tools-button{width:100%}
+  .more-tools-card h2{font-size:1.55rem}
+  .footer-inner{min-height:110px;justify-content:center;flex-wrap:wrap;gap:5px 20px;padding-block:22px}
+  .footer-version{order:3;width:100%;text-align:center}
+  .hrow{gap:12px}
+}
+@media(max-width:370px){.shell{width:calc(100% - 24px)}.panel{padding:16px}.stat span{font-size:.55rem}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="cloud-brand" href="https://cloud247.no/" aria-label="Cloud247"><img src="/assets/cloud247-logo.svg" alt="Cloud247 Technology" width="1024" height="1024"></a>
+    <div class="header-account">
+      <div class="language-switcher" role="group" aria-label="Language / Språk">
+        <button class="is-active" type="button" data-language="no" title="Norsk" aria-pressed="true" lang="nb">NO</button>
+        <button type="button" data-language="en" title="English" aria-pressed="false" lang="en">EN</button>
+      </div>
+      <span class="header-label">Nettfart</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="shell hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow">CLOUD TOOLBOX <span aria-hidden="true">/</span> <span data-i18n="network">NETTVERK</span></p>
+        <h1><span data-i18n="heroTitle">Test nettet ditt.</span><br> <span class="secondary" data-i18n="heroTagline">Fiks det som er tregt.</span></h1>
+        <p class="hero-description" data-i18n="heroDescription">Mål nedlasting, opplasting, ping og stabilitet på under et halvt minutt. Går noe tregt, får du konkrete forslag til hva du kan gjøre, tilpasset Wi‑Fi, kabel eller mobilnett.</p>
+        <div class="hero-tags">
+          <span><span class="tiny-dot" aria-hidden="true"></span><span data-i18n="tagFree">Gratis, ingen konto</span></span>
+          <span data-i18n="tagLocal">Resultatene lagres bare på enheten</span>
+          <span data-i18n="tagCloudflare">Måles mot Cloudflare</span>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orbit"></div><div class="orbit orbit-two"></div>
+        <div class="emblem"><svg viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M21.6 64.4A26 26 0 1 1 58.4 64.4" stroke-width="6" opacity=".28"/><path d="M21.6 64.4A26 26 0 1 1 62.5 33" stroke-width="6"/><path d="M40 46 53.9 38" stroke-width="4"/><circle cx="40" cy="46" r="4.5" fill="currentColor" stroke="none"/></svg></div>
+        <div class="art-label"><span class="tiny-dot"></span>CLOUDFLARE EDGE</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="test-section">
+    <div class="shell test-grid">
+      <section class="panel" aria-labelledby="meterTitle">
+        <div class="panel-heading"><span class="step">1</span><div><p class="kicker" data-i18n="measure">MÅLING</p><h2 id="meterTitle" data-i18n="runTitle">Start testen</h2></div><span class="badge grade" id="grade" hidden></span></div>
+        <div class="meter" id="meter">
+          <svg class="gauge" id="gauge" viewBox="0 0 300 246" role="img" aria-labelledby="gaugeTxt">
+            <title id="gaugeTxt">Fartsmåler</title>
+            <g id="ticks"></g>
+            <path class="track" d="M66.56 229.44A118 118 0 1 1 233.44 229.44"/>
+            <path class="val" id="gVal" d="M66.56 229.44A118 118 0 1 1 233.44 229.44" pathLength="100" stroke-dasharray="0 200" opacity="0"/>
+            <circle class="knob" id="gKnob" cx="66.56" cy="229.44" r="9" opacity="0"/>
+            <text class="num" id="gNum" x="150" y="150">–</text>
+            <text class="unit" id="gUnit" x="150" y="176">Mbit/s</text>
+            <text class="phase" id="gPhase" x="150" y="226">Klar</text>
+          </svg>
+          <div class="runbar" aria-hidden="true"><i id="runBar"></i></div>
+          <button class="start" id="startBtn" type="button"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><span id="startTxt">Start test</span></button>
+          <p class="where"><span data-i18n="server">Server</span><span id="where">–</span></p>
+        </div>
+        <p class="field-help" data-i18n="runHelp">Testen bruker fire tilkoblinger samtidig i 8 sekunder hver vei. På raske linjer stopper den ved 250 MB ned og 100 MB opp, så den ikke spiser mobildata.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="resTitle">
+        <div class="panel-heading"><span class="step">2</span><div><p class="kicker" data-i18n="result">RESULTAT</p><h2 id="resTitle" data-i18n="resultTitle">Dine tall</h2></div></div>
+        <div id="banner" class="notice" role="alert" hidden></div>
+        <div class="stats">
+          <div class="stat main"><span><i style="background:var(--yellow)"></i><span data-i18n="down">Ned</span></span><b id="sDown">–</b></div>
+          <div class="stat main"><span><i style="background:var(--sky)"></i><span data-i18n="up">Opp</span></span><b id="sUp">–</b></div>
+          <div class="stat main"><span data-i18n="ping">Ping</span><b id="sPing">–</b></div>
+          <div class="stat"><span data-i18n="jitter">Jitter</span><b id="sJitter">–</b></div>
+          <div class="stat"><span data-i18n="loaded" data-i18n-title="loadedHelp" title="Ping mens linja er full">Under last</span><b id="sLoaded">–</b></div>
+          <div class="stat"><span data-i18n="dataUsed">Data brukt</span><b id="sData">–</b></div>
+        </div>
+        <p class="field-help" data-i18n="unitsHelp">Ned og opp i Mbit/s, ping og jitter i millisekunder.</p>
+        <div class="ctx">
+          <span class="ctx-label" id="connLbl" data-i18n="connQuestion">Hvordan er du koblet til?</span>
+          <div class="mode-tabs" id="connSeg" role="group" aria-labelledby="connLbl">
+            <button type="button" data-conn="wifi" aria-pressed="false" data-i18n="connWifi">Wi‑Fi</button>
+            <button type="button" data-conn="cable" aria-pressed="false" data-i18n="connCable">Kabel</button>
+            <button type="button" data-conn="mobile" aria-pressed="false" data-i18n="connMobile">Mobilnett</button>
+          </div>
+          <div class="plan-row">
+            <label for="planIn"><span data-i18n="plan">Abonnement</span><small data-i18n="planHelp">Valgfritt: hva leverandøren lover</small></label>
+            <div class="number-unit"><input id="planIn" inputmode="numeric" placeholder="500" autocomplete="off"><span>Mbit/s</span></div>
+          </div>
+        </div>
+        <button class="secondary-button" id="shareBtn" type="button" hidden data-i18n="copyResult">Kopier resultat</button>
+      </section>
+    </div>
+  </section>
+
+  <section class="info-section" id="usesWrap" hidden>
+    <div class="shell">
+      <div class="section-title"><p class="kicker" data-i18n="usage">BRUK</p><h2 data-i18n="usesTitle">Hva holder nettet til?</h2></div>
+      <div class="uses" id="uses"></div>
+    </div>
+  </section>
+
+  <section class="info-section" id="sugWrap" hidden>
+    <div class="shell">
+      <div class="section-title"><p class="kicker" data-i18n="suggestions">FORSLAG</p><h2 id="sugTitle">Forslag</h2></div>
+      <div class="sugs" id="sugs"></div>
+    </div>
+  </section>
+
+  <section class="info-section" id="histWrap" hidden>
+    <div class="shell">
+      <div class="section-title hist-head"><div><p class="kicker" data-i18n="history">HISTORIKK</p><h2 data-i18n="histTitle">Tidligere tester</h2></div><button class="text-button" id="histClear" type="button" data-i18n="histClear">Tøm historikken</button></div>
+      <div class="panel"><ul class="hist" id="hist"></ul><p class="field-help" data-i18n="histLocal">Lagres bare på denne enheten.</p></div>
+    </div>
+  </section>
+
+  <section class="more-tools-section">
+    <div class="shell more-tools-card">
+      <div><p class="eyebrow">CLOUD TOOLBOX</p><h2 data-i18n="moreTitle">Flere gratis verktøy</h2><p data-i18n="moreText">Sjekk domenet, e-posten og Microsoft-miljøet ditt.</p></div>
+      <a class="tools-button" href="https://cloud247.no/"><span data-i18n="moreButton">Til Cloud Toolbox</span> <span aria-hidden="true">&rarr;</span></a>
+    </div>
+  </section>
+</main>
+
+<footer><div class="shell footer-inner"><span>&copy; <span id="year">2026</span> Cloud247</span><span class="footer-version">Nettfart <span id="verTxt">v1</span></span><a href="https://cloud247.no/">cloud247.no <span aria-hidden="true">&nearr;</span></a></div></footer>
+
+<script src="/i18n.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
