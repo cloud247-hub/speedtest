@@ -669,7 +669,7 @@ function grade(r) {
 }
 
 function showResult(r, keepGauge) {
-  if (!keepGauge) { gauge({ num: r.down, speed: r.down, phase: "phDone" }); series = r.series || null; drawChart(); }
+  if (!keepGauge) { gauge({ num: r.down, speed: r.down, phase: "phDone" }); series = r.series || null; drawChart(); openSugs = null; }
   $("sDown").textContent = fmtSpeed(r.down);
   $("sUp").textContent = fmtSpeed(r.up);
   $("sPing").textContent = fmtMs(r.ping);
@@ -789,15 +789,25 @@ function renderAdvice() {
   const list = advise(r);
   const problems = list.filter(s => s.level === "bad" || s.level === "warn").length;
   $("sugTitle").textContent = problems ? t("sugTitleN", { n: problems }) : t("sugTitle");
+  // one row per finding; the most important one starts open, and what the user opens stays open on redraws
+  const key = s => Array.isArray(s.title) ? s.title[0] : s.title;
+  if (!openSugs) openSugs = new Set(list.length ? [key(list[0])] : []);
   $("sugs").innerHTML = list.map(s => `
-    <article class="sug ${s.level}">
-      <span class="tag">${esc(t(tags[s.level]))}</span>
-      <h3>${esc(msg(s.title))}</h3>
-      <p>${esc(msg(s.why))}</p>
-      ${s.steps.length ? `<ol>${s.steps.map(step => `<li><span>${esc(msg(step))}</span></li>`).join("")}</ol>` : ""}
-    </article>`).join("");
+    <details class="sug ${s.level}" data-key="${esc(key(s))}"${openSugs.has(key(s)) ? " open" : ""}>
+      <summary><span class="tag">${esc(t(tags[s.level]))}</span><h3>${esc(msg(s.title))}</h3><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+      <div class="sug-body">
+        <p>${esc(msg(s.why))}</p>
+        ${s.steps.length ? `<ol>${s.steps.map(step => `<li><span>${esc(msg(step))}</span></li>`).join("")}</ol>` : ""}
+      </div>
+    </details>`).join("");
   $("sugWrap").hidden = false;
 }
+let openSugs = null;  // titles of the open findings; reset for each new result
+$("sugs").addEventListener("toggle", e => {
+  const d = e.target;
+  if (!d.dataset?.key || !openSugs) return;
+  d.open ? openSugs.add(d.dataset.key) : openSugs.delete(d.dataset.key);
+}, true);
 
 function renderHistory() {
   $("histWrap").hidden = !history.length;
