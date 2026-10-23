@@ -137,6 +137,36 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #b18c
 .number-unit{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.74rem;font-weight:500;flex:none}
 .number-unit input{width:92px;border:1px solid #ccd3dc;background:#fff;border-radius:9px;padding:8px 8px 8px 10px;font-size:1.04rem;font-weight:800;color:var(--navy)}
 .number-unit input::placeholder{color:#a3acb9;font-weight:500}
+/* view switch (gauge / graph) and the graph: speed over time on top, ping (other unit, own scale) below */
+.view-tabs{grid-template-columns:repeat(2,1fr);margin-bottom:14px}
+.chart{position:relative;width:100%;max-width:400px;display:flex;flex-direction:column;gap:8px}
+.chart-head{margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:10px;color:var(--yellow);font-size:.62rem;font-weight:850;letter-spacing:.16em;text-transform:uppercase}
+.meter.up .chart-head{color:var(--sky)}
+.chart-head b{color:#fff;font-size:1.35rem;font-weight:820;letter-spacing:-.04em;text-transform:none;font-variant-numeric:tabular-nums}
+.chart-legend{display:flex;flex-wrap:wrap;gap:6px 14px;color:#c5d0db;font-size:.68rem;font-weight:600}
+.chart-legend>span{display:inline-flex;align-items:center;gap:6px}
+.chart-legend i{display:inline-block;width:14px;height:0;border-top:2px solid}
+.chart-legend .sw-down{border-color:var(--yellow)}
+.chart-legend .sw-up{border-color:var(--sky);border-top-style:dashed}
+.chart-legend .sw-idle{width:6px;height:6px;border:0;border-radius:50%;background:#8fa7bb}
+#chartSvg{width:100%;height:auto;display:block;overflow:visible;touch-action:pan-y}
+#chartSvg .grid{stroke:rgba(255,255,255,.08);stroke-width:1}
+#chartSvg .axis{fill:#8fa7bb;font:500 9.5px var(--mono)}
+#chartSvg .ttl{fill:#8fa7bb;font-size:9px;font-weight:850;letter-spacing:.12em;text-transform:uppercase}
+#chartSvg .band{fill:rgba(255,255,255,.035)}
+#chartSvg .bandlbl{fill:#8fa7bb;font-size:8.5px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}
+#chartSvg .line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+#chartSvg .down{stroke:var(--yellow)} #chartSvg .up{stroke:var(--sky);stroke-dasharray:5 3}
+#chartSvg .end{stroke:var(--navy);stroke-width:2}
+#chartSvg .endlbl{fill:#fff;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums}
+#chartSvg .dot{stroke:var(--navy);stroke-width:1}
+#chartSvg .cross{stroke:rgba(255,255,255,.45);stroke-width:1;stroke-dasharray:2 2}
+.chart-tip{position:absolute;top:58px;transform:translateX(-50%);pointer-events:none;background:#fff;color:var(--ink);border-radius:9px;padding:6px 9px;font-size:.7rem;line-height:1.45;box-shadow:var(--shadow);white-space:nowrap;z-index:2}
+.chart-tip b{font-variant-numeric:tabular-nums}
+.chart-tip i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+.chart-empty{margin:0;color:#8fa7bb;font-size:.78rem;text-align:center;padding:4px 0 2px}
+.meter.graph .gauge{display:none}
+
 /* on/off switch, same as the other Cloud Toolbox tools */
 .switch-row{position:relative;display:flex;align-items:center;gap:12px;justify-content:space-between;padding:15px 0 0;margin-top:16px;border-top:1px solid var(--line);cursor:pointer}
 .switch-row>span:first-child{display:flex;flex-direction:column;gap:3px}
@@ -284,7 +314,22 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
     <div class="shell test-grid">
       <section class="panel" aria-labelledby="meterTitle">
         <div class="panel-heading"><span class="step">1</span><div><p class="kicker" data-i18n="measure">MÅLING</p><h2 id="meterTitle" data-i18n="runTitle">Start testen</h2></div><span class="badge grade" id="grade" hidden></span></div>
+        <div class="mode-tabs view-tabs" id="viewTabs" role="group" data-i18n-aria="viewLabel" aria-label="Visning">
+          <button type="button" data-view="gauge" aria-pressed="true" data-i18n="viewGauge">Måler</button>
+          <button type="button" data-view="graph" aria-pressed="false" data-i18n="viewGraph">Graf</button>
+        </div>
         <div class="meter" id="meter">
+          <div class="chart" id="chartWrap" hidden>
+            <p class="chart-head"><span id="chartPhase">Klar</span><b id="chartNow">–</b></p>
+            <div class="chart-legend" aria-hidden="true">
+              <span><i class="sw-down"></i><span data-i18n="down">Ned</span></span>
+              <span><i class="sw-up"></i><span data-i18n="up">Opp</span></span>
+              <span><i class="sw-idle"></i><span data-i18n="pingIdle">Ping i ro</span></span>
+            </div>
+            <svg id="chartSvg" viewBox="0 0 340 236" role="img"></svg>
+            <div class="chart-tip" id="chartTip" hidden></div>
+            <p class="chart-empty" id="chartEmpty" data-i18n="chartEmpty">Kjør en test for å se grafen.</p>
+          </div>
           <svg class="gauge" id="gauge" viewBox="0 0 300 246" role="img" aria-labelledby="gaugeTxt">
             <title id="gaugeTxt">Fartsmåler</title>
             <g id="ticks"></g>
@@ -361,9 +406,9 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
   </section>
 </main>
 
-<footer><div class="shell footer-inner"><span>&copy; <span id="year">2026</span> Cloud247</span><span class="footer-version">Nettfart <span id="verTxt">v1.4.0</span></span><a href="https://cloud247.no/">cloud247.no <span aria-hidden="true">&nearr;</span></a></div></footer>
+<footer><div class="shell footer-inner"><span>&copy; <span id="year">2026</span> Cloud247</span><span class="footer-version">Nettfart <span id="verTxt">v1.5.0</span></span><a href="https://cloud247.no/">cloud247.no <span aria-hidden="true">&nearr;</span></a></div></footer>
 
-<script src="i18n.js?v=1.4.0"></script>
-<script src="app.js?v=1.4.0"></script>
+<script src="i18n.js?v=1.5.0"></script>
+<script src="app.js?v=1.5.0"></script>
 </body>
 </html>

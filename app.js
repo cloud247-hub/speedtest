@@ -40,6 +40,10 @@ const CONN_KEY = { wifi: "connWifi", cable: "connCable", mobile: "connMobile" };
 let conn = store.get("nf_conn", null) || ({ wifi: "wifi", ethernet: "cable", cellular: "mobile" })[navigator.connection?.type] || "wifi";
 let plan = store.get("nf_plan", null);
 let saver = store.get("nf_saver", false);
+let view = store.get("nf_view", "gauge") === "graph" ? "graph" : "gauge";
+// What the graph draws: seconds since the test started → Mbit/s per direction, every ping with its phase,
+// and when each phase ran. Saved with the result (rounded), so a past test can be drawn again.
+let series = null;
 let running = null, last = null, history = store.get("nf_hist", []);
 try { performance.setResourceTimingBufferSize(500); } catch {}
 
@@ -81,6 +85,8 @@ function gauge(state) {
   $("gUnit").textContent = unit;
   $("gPhase").textContent = t(phase);
   $("gaugeTxt").textContent = `${t(phase)}: ${value} ${unit}`;
+  $("chartPhase").textContent = t(phase);
+  $("chartNow").textContent = num == null ? "–" : `${value} ${unit}`;
 }
 const progress = f => { $("runBar").style.width = (Math.min(1, f) * 100).toFixed(1) + "%"; };
 
@@ -144,7 +150,7 @@ async function fetchUp(size, add, signal) {
 // One direction: parallel streams that keep asking for bigger chunks until the time (or data cap) is up
 // (upload chunks stay shorter, since they only count once they're done), plus a ping every 300 ms to catch
 // bufferbloat (latency that rises when the line is busy).
-async function throughput(dir, signal, capped, onTick) {
+async function throughput(dir, signal, { capped, onTick, onPing }) {
   const ctrl = new AbortController(), stop = () => ctrl.abort();
   signal.addEventListener("abort", stop);
   let total = 0, errors = 0, closing = false, drainTimer;
@@ -179,7 +185,7 @@ async function throughput(dir, signal, capped, onTick) {
   const pinger = async () => {
     await sleep(1000, ctrl.signal);
     while (!ctrl.signal.aborted && !closing) {
-      try { loaded.push(await ping(ctrl.signal)); } catch { break; }
+      try { const ms = await ping(ctrl.signal); loaded.push(ms); onPing(ms); } catch { break; }
       await sleep(300, ctrl.signal);
     }
   };
@@ -230,6 +236,9 @@ async function runTest() {
   for (const id of ["sDown", "sUp", "sPing", "sJitter", "sLoaded", "sData"]) $(id).textContent = "–";
   $("grade").hidden = true;
   const r = { at: Date.now(), conn, plan, saver, bytes: 0, errors: 0 };
+  const T0 = performance.now(), sec = () => (performance.now() - T0) / 1000;
+  series = { phases: {}, down: [], up: [], ping: [] };
+  drawChart();
 
   try {
     // 1. ping and jitter on an idle line (first request warms up the connection and isn't counted)
@@ -239,6 +248,7 @@ async function runTest() {
     const pings = [];
     for (let i = 0; i < PINGS; i++) {
       pings.push(await ping(ctrl.signal));
+      series.ping.push([sec(), pings.at(-1), "idle"]);
       const m = median(pings);
       gauge({ num: m, ms: true, phase: "phPing" });
       $("sPing").textContent = fmtMs(m);
@@ -252,11 +262,20 @@ async function runTest() {
 
     // 2. download, 3. upload
     for (const [dir, phase, base] of [["down", "phDown", .1], ["up", "phUp", .55]]) {
-      const out = await throughput(dir, ctrl.signal, r.saver, (live, f) => {
-        gauge({ num: live, speed: live, phase, dir });
-        $(dir === "down" ? "sDown" : "sUp").textContent = fmtSpeed(live);
-        progress(base + .45 * Math.min(1, f));
+      series.phases[dir] = [sec(), null];
+      const out = await throughput(dir, ctrl.signal, {
+        capped: r.saver,
+        onTick: (live, f) => {
+          series[dir].push([sec(), live]);
+          series.phases[dir][1] = sec();
+          gauge({ num: live, speed: live, phase, dir });
+          $(dir === "down" ? "sDown" : "sUp").textContent = fmtSpeed(live);
+          progress(base + .45 * Math.min(1, f));
+          drawChart();
+        },
+        onPing: ms => series.ping.push([sec(), ms, dir]),
       });
+      series.phases[dir][1] = sec();
       r[dir] = out.mbps;
       r[dir === "down" ? "loadedDown" : "loadedUp"] = out.loaded;
       r.bytes += out.bytes;
@@ -266,6 +285,9 @@ async function runTest() {
     }
 
     progress(1);
+    series.end = sec();
+    series.result = { down: r1(r.down), up: r1(r.up) };
+    r.series = packSeries(series);
     last = r;
     history = [r, ...history].slice(0, 20);
     store.set("nf_hist", history);
@@ -281,6 +303,8 @@ async function runTest() {
   } finally {
     running = null;
     setRunning(false);
+    if (series && series.end == null) series.end = sec();
+    drawChart();
   }
 }
 
@@ -299,6 +323,121 @@ function showWhere(r) {
   $("where").textContent = bits.length ? bits.join(" · ") : "–";
 }
 
+// ---------- graph view ----------
+const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
+const packSeries = sr => ({
+  end: r2(sr.end), result: sr.result, phases: Object.fromEntries(Object.entries(sr.phases).map(([k, [a, b]]) => [k, [r2(a), r2(b)]])),
+  down: sr.down.map(([x, v]) => [r2(x), r1(v)]), up: sr.up.map(([x, v]) => [r2(x), r1(v)]),
+  ping: sr.ping.map(([x, v, p]) => [r2(x), r1(v), p]),
+});
+const niceMax = v => {
+  if (!(v > 0)) return 1;
+  const p = 10 ** Math.floor(Math.log10(v));
+  return [1, 2, 2.5, 5, 10].map(m => m * p).find(m => m >= v);
+};
+const fmtSec = v => v.toLocaleString(locale(), { maximumFractionDigits: 1 });
+// layout in viewBox units: speed plot on top, ping plot below, same time axis
+const CW = 340, PL = 34, PR = 38, AT = 16, AH = 120, BT = 166, BH = 44;
+const COLOR = { down: "var(--yellow)", up: "var(--sky)", idle: "#8fa7bb" };
+let chartScale = null;  // what the hover layer needs to map a pointer position back to the data
+
+function drawChart() {
+  if (view !== "graph") return;
+  $("chartEmpty").hidden = !!series;
+  $("chartSvg").toggleAttribute("hidden", !series);
+  hideTip();
+  if (!series) return;
+  const sr = series, live = sr.end == null;
+  const lastT = Math.max(0, ...[...sr.down, ...sr.up, ...sr.ping].map(p => p[0]));
+  // while running, leave room for the rest of the test so the lines don't keep rescaling
+  const tMax = live ? Math.max(lastT + 1, (sr.phases.down ? sr.phases.down[0] : lastT) + 17.5) : Math.max(1, sr.end);
+  const x = v => PL + (CW - PL - PR) * v / tMax;
+  const result = sr.result;  // the final numbers, once the test is done
+  const peak = Math.max(...sr.down.map(p => p[1]), ...sr.up.map(p => p[1]), result?.down || 0, result?.up || 0);
+  const vMax = niceMax(peak), pMax = niceMax(Math.max(...sr.ping.map(p => p[1])));
+  const ya = v => AT + AH - AH * Math.min(v, vMax) / vMax, yb = v => BT + BH - BH * Math.min(v, pMax) / pMax;
+  let g = "";
+  // phase bands
+  for (const dir of ["down", "up"]) {
+    const ph = sr.phases[dir];
+    if (!ph) continue;
+    const a = x(ph[0]), b = x(ph[1] ?? lastT);
+    g += `<rect class="band" x="${a.toFixed(1)}" y="${AT}" width="${Math.max(0, b - a).toFixed(1)}" height="${BT + BH - AT}"/>`;
+    g += `<text class="bandlbl" x="${(a + 4).toFixed(1)}" y="${AT - 5}">${esc(t(dir))}</text>`;
+  }
+  // speed grid + axis
+  g += `<text class="ttl" x="0" y="${AT - 5}">${esc(t("chartSpeed").split(" · ")[1])}</text>`;
+  for (const v of [0, vMax / 2, vMax]) {
+    g += `<line class="grid" x1="${PL}" x2="${CW - PR}" y1="${ya(v).toFixed(1)}" y2="${ya(v).toFixed(1)}"/>`;
+    g += `<text class="axis" x="${PL - 9}" y="${(ya(v) + 3).toFixed(1)}" text-anchor="end">${esc(fmtSpeed(v))}</text>`;
+  }
+  // speed lines, each ending in a dot with its value (the final result once the test is done)
+  for (const dir of ["down", "up"]) {
+    const pts = sr[dir];
+    if (!pts.length) continue;
+    g += `<path class="line ${dir}" d="${pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${ya(p[1]).toFixed(1)}`).join("")}"/>`;
+    const [lx, lv] = pts.at(-1), val = result ? result[dir] : lv;
+    const ex = x(lx), ey = ya(lv);
+    g += `<circle class="end" cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="4" fill="${COLOR[dir]}"/>`;
+    g += `<text class="endlbl" x="${(ex - 6).toFixed(1)}" y="${(ey < AT + 14 ? ey + 16 : ey - 8).toFixed(1)}" text-anchor="end">${esc(fmtSpeed(val))}</text>`;
+  }
+  // ping plot: every ping as a dot, coloured by the phase it was taken in
+  for (const v of [0, pMax]) {
+    g += `<line class="grid" x1="${PL}" x2="${CW - PR}" y1="${yb(v).toFixed(1)}" y2="${yb(v).toFixed(1)}"/>`;
+    g += `<text class="axis" x="${PL - 9}" y="${(yb(v) + 3).toFixed(1)}" text-anchor="end">${esc(fmtMs(v))}</text>`;
+  }
+  g += `<text class="ttl" x="0" y="${BT - 6}">${esc(t("chartPing"))}</text>`;
+  for (const [px, pv, ph] of sr.ping) g += `<circle class="dot" cx="${x(px).toFixed(1)}" cy="${yb(pv).toFixed(1)}" r="2.6" fill="${COLOR[ph]}"/>`;
+  // time axis
+  const step = tMax > 30 ? 8 : tMax > 14 ? 4 : 2;
+  for (let v = 0; v <= tMax + .01; v += step) g += `<text class="axis" x="${x(v).toFixed(1)}" y="${BT + BH + 14}" text-anchor="middle">${v} ${esc(t("sec"))}</text>`;
+  g += `<line class="cross" id="chartCross" x1="0" x2="0" y1="${AT}" y2="${BT + BH}" visibility="hidden"/>`;
+  g += `<rect id="chartHit" x="${PL}" y="${AT - 10}" width="${CW - PL - PR}" height="${BT + BH - AT + 24}" fill="transparent"/>`;
+  $("chartSvg").innerHTML = g;
+  chartScale = { tMax, x };
+  const maxLoaded = Math.max(0, ...sr.ping.filter(p => p[2] !== "idle").map(p => p[1]));
+  const idle = median(sr.ping.filter(p => p[2] === "idle").map(p => p[1]));
+  $("chartSvg").setAttribute("aria-label", t("chartAria", {
+    down: fmtSpeed(result ? result.down : sr.down.at(-1)?.[1]), up: fmtSpeed(result ? result.up : sr.up.at(-1)?.[1]),
+    ping: fmtMs(idle), max: fmtMs(maxLoaded || idle),
+  }));
+}
+
+// hover / touch: a crosshair and the values at that moment
+function hideTip() { $("chartTip").hidden = true; $("chartCross")?.setAttribute("visibility", "hidden"); }
+function showTip(ev) {
+  if (!series || !chartScale) return;
+  const svg = $("chartSvg"), pt = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
+  const tAt = Math.max(0, Math.min(chartScale.tMax, (pt.x - PL) / (CW - PL - PR) * chartScale.tMax));
+  const near = pts => pts.reduce((best, p) => !best || Math.abs(p[0] - tAt) < Math.abs(best[0] - tAt) ? p : best, null);
+  const rows = [];
+  for (const dir of ["down", "up"]) {
+    const ph = series.phases[dir], p = ph && tAt >= ph[0] && tAt <= (ph[1] ?? Infinity) ? near(series[dir]) : null;
+    if (p) rows.push(`<i style="background:${COLOR[dir]}"></i>${esc(t(dir))} <b>${esc(fmtSpeed(p[1]))}</b> Mbit/s`);
+  }
+  const pp = near(series.ping);
+  if (pp && Math.abs(pp[0] - tAt) < .8) rows.push(`<i style="background:${COLOR[pp[2]]}"></i>${esc(t("ping"))} <b>${esc(fmtMs(pp[1]))}</b> ms`);
+  const cx = chartScale.x(tAt);
+  $("chartCross").setAttribute("x1", cx); $("chartCross").setAttribute("x2", cx); $("chartCross").setAttribute("visibility", "visible");
+  const tip = $("chartTip");
+  tip.innerHTML = `${esc(fmtSec(tAt))} ${esc(t("sec"))}${rows.length ? "<br>" + rows.join("<br>") : ""}`;
+  tip.hidden = false;
+  const box = $("chartWrap").getBoundingClientRect(), rel = (ev.clientX - box.left) / box.width;
+  tip.style.left = `${Math.min(Math.max(rel * 100, 18), 82)}%`;
+}
+$("chartSvg").addEventListener("pointermove", e => { if (e.target.id === "chartHit" || e.target.closest("#chartSvg")) showTip(e); });
+$("chartSvg").addEventListener("pointerleave", hideTip);
+
+function setView(v) {
+  view = v;
+  store.set("nf_view", v);
+  for (const b of $("viewTabs").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.view === v));
+  $("meter").classList.toggle("graph", v === "graph");
+  $("chartWrap").hidden = v !== "graph";
+  drawChart();
+}
+$("viewTabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setView(b.dataset.view); });
+
 // ---------- results ----------
 function grade(r) {
   if (r.down >= 300 && r.ping <= 30) return "gradeBlazing";
@@ -309,7 +448,7 @@ function grade(r) {
 }
 
 function showResult(r, keepGauge) {
-  if (!keepGauge) gauge({ num: r.down, speed: r.down, phase: "phDone" });
+  if (!keepGauge) { gauge({ num: r.down, speed: r.down, phase: "phDone" }); series = r.series || null; drawChart(); }
   $("sDown").textContent = fmtSpeed(r.down);
   $("sUp").textContent = fmtSpeed(r.up);
   $("sPing").textContent = fmtMs(r.ping);
@@ -504,12 +643,14 @@ $("histClear").addEventListener("click", () => {
 document.querySelectorAll("[data-language]").forEach(b => b.addEventListener("click", () => Cloud247I18n.setLanguage(b.dataset.language)));
 Cloud247I18n.onChange(() => {
   gauge(gaugeState);
+  drawChart();
   setRunning(!!running);
   if (last && !running) showResult(last, true);
   else { renderAdvice(); renderHistory(); }
 });
 
 Cloud247I18n.apply();
+setView(view);
 setConn(conn);
 gauge({});
 if (history.length) { last = history[0]; showResult(last); gauge({ num: last.down, speed: last.down, phase: "phPrev" }); }

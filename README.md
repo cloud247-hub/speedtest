@@ -7,6 +7,7 @@ Speedtest fra Cloud247, en del av [Cloud Toolbox](https://cloud247.no/). Måler 
 - Metoden følger Cloudflares bibliotek: ping er tid til første byte (Resource Timing) minus serverens egen behandlingstid fra `Server-Timing`, og farten er 90-persentilen av farten per sekund etter oppvarmingen. Datasenter (`cf-meta-colo`/`cf-meta-city`) leses fra svarheaderne, HTTP-versjonen fra Resource Timing.
 - Hver retning kjøres med 4 parallelle strømmer i 8 sekunder. De første 1,5 sekundene (oppvarming) telles ikke. På en gigabit-linje bruker testen rundt 1 GB hver vei. Bryteren «Spar data» (av som standard, valget huskes) stopper testen ved 250 MB ned / 100 MB opp.
 - «Under last» måles over samme forbindelse som testdataene (som hos Cloudflare), så den blir gjerne noe høyere enn hos speedtest.net, som bruker egne forbindelser til ping.
+- To visninger av testen (valget huskes): **Måler** (fartsmåler) og **Graf**, med fart over tid for ned og opp og en egen ping-graf under med samme tidsakse, så du ser pingen stige når linja er i bruk. Pek eller dra fingeren over grafen for verdier. Grafdataene lagres med resultatet, så forrige test kan vises igjen.
 - Forslagene tar hensyn til hvordan du er koblet til (Wi‑Fi, kabel, mobilnett) og eventuelt hva abonnementet lover.
 - Historikk og språkvalg lagres bare i nettleseren (localStorage).
 - Designet følger cloud247.no: navy `#061A2F`, gul `#FAD63A`, Inter/systemfont og Cloud247-logoen i toppen.

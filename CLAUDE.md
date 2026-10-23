@@ -9,6 +9,7 @@ Speedtest fra Cloud247 (Cloud Toolbox). Statisk side på **GitHub Pages**. UI-et
 - `app.js` — måling og forslagsmotor, ren JS uten byggesteg. Dynamisk tekst hentes med `t(key, values)`.
 - Ingen egen server. Målingene går mot `https://speed.cloudflare.com` (`__down?bytes=N`, `__up`). `/meta` har ikke CORS og skal ikke brukes; datasenter leses fra `cf-meta-*`-headerne.
 - Metoden følger `@cloudflare/speedtest` (npm): ping = TTFB fra Resource Timing minus `Server-Timing` (`cfRequestDuration`), fart = 90-persentil av 1-sekunders vinduer etter oppvarming. Endres metoden, sjekk mot bibliotekets kildekode.
+- Visninger: «Måler» (SVG-gauge) og «Graf» (`drawChart()` i `app.js`): fart (Mbit/s) og ping (ms) i hver sin plott med felles tidsakse, aldri to y-akser i samme plott. Grafdata (`series`) lagres avrundet i historikken.
 - Publiseres av GitHub Pages fra `main` / rot. `.nojekyll` gjør at filene serveres som de er.
 
 ## Regler
