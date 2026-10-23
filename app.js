@@ -9,6 +9,11 @@ const sleep = (ms, signal) => new Promise(r => {
   signal?.addEventListener("abort", () => { clearTimeout(timer); r(); }, { once: true });
 });
 const rnd = () => Math.random().toString(36).slice(2);
+// percentile with linear interpolation (same as Cloudflare's speedtest)
+const percentile = (vals, p) => {
+  const s = [...vals].sort((x, y) => x - y), i = (s.length - 1) * p, lo = Math.floor(i);
+  return s.length ? s[lo] + (s[Math.ceil(i)] - s[lo]) * (i - lo) : null;
+};
 const median = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : null; };
 const mbit = (bytes, ms) => ms > 0 ? bytes * 8 / (ms / 1000) / 1e6 : 0;
 const locale = () => Cloud247I18n.getLanguage() === "en" ? "en-GB" : "nb-NO";
@@ -77,8 +82,21 @@ function gauge(state) {
 const progress = f => { $("runBar").style.width = (Math.min(1, f) * 100).toFixed(1) + "%"; };
 
 // ---------- measuring ----------
-// Ping is an empty download. Resource Timing (request sent → first byte back) leaves out the browser's own
-// overhead when the server allows it (Timing-Allow-Origin); otherwise wall-clock time is used.
+// Cloudflare reports its own processing time in Server-Timing; subtracting it leaves the network round trip.
+// (Same parsing as Cloudflare's @cloudflare/speedtest.)
+function serverTime(res) {
+  const h = res.headers.get("server-timing") || "";
+  const m = h.match(/(?:^|,\s*)cfReq(?:uest)?Dur(?:ation)?;\s*dur=([0-9.]+)/i);
+  if (m) return +m[1];
+  let sum = 0;
+  for (const x of h.matchAll(/(?:^|,\s*)cfSpeed[a-zA-Z]*;\s*dur=([0-9.]+)/gi)) sum += +x[1];
+  return sum;
+}
+const HTTP = { "http/1.1": "HTTP/1.1", h2: "HTTP/2", h3: "HTTP/3" };
+let server = {};  // where the test runs: Cloudflare data centre from the cf-meta-* headers, HTTP version from Resource Timing
+
+// Ping is an empty download: time to first byte from Resource Timing (leaves out the browser's own overhead),
+// minus the server's processing time. Falls back to wall-clock time if the timings aren't exposed.
 async function ping(signal) {
   const url = `${SPEED}/__down?bytes=0&r=${rnd()}`;
   const t0 = performance.now();
@@ -87,7 +105,11 @@ async function ping(signal) {
   const wall = performance.now() - t0;
   const e = performance.getEntriesByName(url).pop();
   performance.clearResourceTimings();
-  return e && e.requestStart > 0 && e.responseStart > e.requestStart ? e.responseStart - e.requestStart : wall;
+  const first = e && (e.finalResponseHeadersStart || e.responseStart);
+  const ttfb = e && e.requestStart > 0 && first > e.requestStart ? first - e.requestStart : wall;
+  if (res.headers.get("cf-meta-colo")) server = { colo: res.headers.get("cf-meta-colo"), city: res.headers.get("cf-meta-city"), country: res.headers.get("cf-meta-country") };
+  if (e?.nextHopProtocol) server.http = HTTP[e.nextHopProtocol] || e.nextHopProtocol.toUpperCase();
+  return Math.max(0, ttfb - serverTime(res));
 }
 
 async function fetchDown(size, add, signal) {
@@ -172,17 +194,25 @@ async function throughput(dir, signal, onTick) {
 
   const end = performance.now() - t0;
   if (!total) throw new Error(t(dir === "down" ? "errNoDown" : "errNoUp"));
+  samples.push([end, total]);
+  // Bytes moved between two moments. Download: interpolated from the 100 ms samples. Upload: each finished chunk
+  // is spread evenly over the time it took (it only counts once it's done).
+  const at = time => {
+    const i = samples.findIndex(s => s[0] >= time);
+    if (i <= 0) return i < 0 ? total : samples[0][1];
+    const [t1, b1] = samples[i - 1], [t2, b2] = samples[i];
+    return b1 + (b2 - b1) * (time - t1) / Math.max(1, t2 - t1);
+  };
+  const between = dir === "up"
+    ? (a, b) => chunks.reduce((sum, c) => sum + c.n * Math.max(0, Math.min(c.e, b) - Math.max(c.s, a)) / Math.max(1, c.e - c.s), 0)
+    : (a, b) => at(b) - at(a);
+  // Result: 90th percentile of the one-second rates after the warm-up, like Cloudflare's 90th percentile per
+  // request. Wi‑Fi dips and the pauses between requests don't drag it down, and no single burst decides it.
   // Fast lines hit the cap before the warm-up is over; then the whole run counts.
-  const w = end > WARMUP_MS * 2 ? WARMUP_MS : 0;
-  let bytes;
-  if (dir === "up") {
-    // a finished upload chunk is spread evenly over the time it took; only the part after the warm-up counts
-    bytes = chunks.reduce((sum, c) => sum + c.n * Math.max(0, c.e - Math.max(c.s, w)) / Math.max(1, c.e - c.s), 0);
-  } else {
-    const from = samples.find(s => s[0] >= w) || samples[0];
-    bytes = total - from[1];
-  }
-  return { mbps: mbit(bytes, end - w), bytes: total, loaded: median(loaded), errors };
+  const w = end > WARMUP_MS * 2 ? WARMUP_MS : 0, rates = [];
+  for (let time = w + 1000; time <= end; time += 100) rates.push(mbit(between(time - 1000, time), 1000));
+  const mbps = rates.length >= 5 ? percentile(rates, .9) : mbit(between(w, end), end - w);
+  return { mbps, bytes: total, loaded: median(loaded), errors };
 }
 
 async function runTest() {
@@ -193,9 +223,6 @@ async function runTest() {
   for (const id of ["sDown", "sUp", "sPing", "sJitter", "sLoaded", "sData"]) $(id).textContent = "–";
   $("grade").hidden = true;
   const r = { at: Date.now(), conn, plan, bytes: 0, errors: 0 };
-  // Where the test runs (colo, ISP, HTTP version). Optional: the result works without it.
-  const infoP = fetch(`${SPEED}/meta`, { cache: "no-store" }).then(x => x.json())
-    .then(m => ({ colo: m.colo, country: m.country, isp: m.asOrganization, http: m.httpProtocol })).catch(() => ({}));
 
   try {
     // 1. ping and jitter on an idle line (first request warms up the connection and isn't counted)
@@ -213,7 +240,7 @@ async function runTest() {
     r.ping = median(pings);
     r.jitter = pings.slice(1).reduce((s, v, i) => s + Math.abs(v - pings[i]), 0) / (pings.length - 1);
     $("sJitter").textContent = fmtMs(r.jitter);
-    Object.assign(r, await infoP);
+    Object.assign(r, server);
     showWhere(r);
 
     // 2. download, 3. upload
@@ -259,7 +286,7 @@ function setRunning(on) {
 const setBanner = text => { $("banner").textContent = text; $("banner").hidden = !text; };
 
 function showWhere(r) {
-  const bits = [r.colo && `Cloudflare ${r.colo}`, r.isp, r.http].filter(Boolean);
+  const bits = [r.colo && `Cloudflare ${r.colo}`, r.city, r.isp, r.http].filter(Boolean);
   $("where").textContent = bits.length ? bits.join(" · ") : "–";
 }
 

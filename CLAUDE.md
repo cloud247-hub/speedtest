@@ -7,7 +7,8 @@ Speedtest fra Cloud247 (Cloud Toolbox). Statisk side på **GitHub Pages**. UI-et
 - `index.html` — markup + CSS (Cloud247-profilen: samme tokens og komponenter som cloud247.no og Password Generator) og en streng CSP i `<meta>`.
 - `i18n.js` — alle tekster på `no` og `en`, samme mønster som de andre Cloud247-verktøyene (`data-i18n`, `data-i18n-aria`, `data-i18n-title`; språkvalget lagres i `cloud247-nettfart-language`). Ny tekst legges inn på begge språk.
 - `app.js` — måling og forslagsmotor, ren JS uten byggesteg. Dynamisk tekst hentes med `t(key, values)`.
-- Ingen egen server. Målingene går mot `https://speed.cloudflare.com` (`__down?bytes=N`, `__up`, `meta`).
+- Ingen egen server. Målingene går mot `https://speed.cloudflare.com` (`__down?bytes=N`, `__up`). `/meta` har ikke CORS og skal ikke brukes; datasenter leses fra `cf-meta-*`-headerne.
+- Metoden følger `@cloudflare/speedtest` (npm): ping = TTFB fra Resource Timing minus `Server-Timing` (`cfRequestDuration`), fart = 90-persentil av 1-sekunders vinduer etter oppvarming. Endres metoden, sjekk mot bibliotekets kildekode.
 - Publiseres av GitHub Pages fra `main` / rot. `.nojekyll` gjør at filene serveres som de er.
 
 ## Regler
