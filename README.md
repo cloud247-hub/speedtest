@@ -2,40 +2,31 @@
 
 Speedtest fra Cloud247, en del av [Cloud Toolbox](https://cloud247.no/). Måler ping, jitter, nedlasting, opplasting og ping under last (bufferbloat), og gir konkrete forslag til hva du kan gjøre når nettet er tregt. Norsk og engelsk (NO/EN-valg i toppen, som de andre verktøyene).
 
-- Kjører på Cloudflare Workers. Ingen database, ingen innlogging og ingen eksterne API-er: testen går mot egne ruter (`/api/ping`, `/api/down`, `/api/up`, `/api/info`).
+- Statisk side på **GitHub Pages**: ingen server, ingen byggesteg, ingen secrets.
+- Testdataene går mot Cloudflares offentlige speedtest-endepunkter på `speed.cloudflare.com` (`__down`, `__up` og `meta`), de samme som speed.cloudflare.com og Cloudflares åpne bibliotek [`@cloudflare/speedtest`](https://github.com/cloudflare/speedtest) bruker. Alle kall er enkle CORS-forespørsler (ingen preflight), og CSP-en tillater bare kall dit.
 - Hver retning kjøres med 4 parallelle strømmer i 8 sekunder. De første 1,5 sekundene (oppvarming) telles ikke. På raske linjer stopper testen ved 250 MB ned / 100 MB opp, så den ikke spiser mobildata.
 - Forslagene tar hensyn til hvordan du er koblet til (Wi‑Fi, kabel, mobilnett) og eventuelt hva abonnementet lover.
 - Historikk og språkvalg lagres bare i nettleseren (localStorage).
 - Designet følger cloud247.no: navy `#061A2F`, gul `#FAD63A`, Inter/systemfont og Cloud247-logoen i toppen.
 
-## Deploy
+## Publisering
 
-Hver push til `main` deployes automatisk via `.github/workflows/deploy.yml`. Engangsoppsett i GitHub-repoet (Settings → Secrets and variables → Actions):
+GitHub Pages publiserer `main` fra roten av repoet (Settings → Pages → *Deploy from a branch*, `main` / `/ (root)`). Hver push til `main` er ute etter et minutt eller to på `https://cloud247-hub.github.io/speedtest/`.
 
-- `CLOUDFLARE_API_TOKEN`: token fra malen **Edit Cloudflare Workers**
-- `CLOUDFLARE_ACCOUNT_ID`: står til høyre på Workers & Pages-oversikten
+Egen adresse som de andre verktøyene (f.eks. `speedtest.cloud247.no`):
 
-Workeren heter `nettfart` og havner på `nettfart.<konto>.workers.dev`. Egen adresse legger du inn under Workers → nettfart → Settings → Domains & Routes, eller i `wrangler.jsonc`:
-
-```jsonc
-"routes": [{ "pattern": "nettfart.cloud247.no", "custom_domain": true }]
-```
-
-Manuelt:
-
-```bash
-npm install
-npx wrangler deploy
-```
+1. DNS: CNAME-post `speedtest` → `cloud247-hub.github.io`
+2. Legg en fil `CNAME` i roten med `speedtest.cloud247.no` (eller skriv adressen under Settings → Pages → Custom domain), og slå på *Enforce HTTPS*.
 
 ## Lokalt
 
-```bash
-npx wrangler dev
-```
+Alle stier er relative, så hvilken som helst statisk server fungerer:
 
-Lokalt blir tallene urealistisk høye (alt går via localhost), og serveren rapporterer HTTP/1.1. Bruk nettleserens nettverksstruping for å se forslagene.
+```bash
+python3 -m http.server 8080
+# åpne http://localhost:8080/
+```
 
 ## Versjon
 
-`version` i `package.json` vises i bunnen av appen. Øk den ved hver endring som deployes.
+Versjonen står i footeren i `index.html` (`id="verTxt"`) og som `?v=` på skriptene (for å tvinge fram ny versjon i nettleserens cache). Øk begge ved hver endring.

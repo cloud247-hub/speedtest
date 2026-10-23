@@ -26,7 +26,7 @@
       phReady: "Klar", phPing: "Måler ping", phDown: "Laster ned", phUp: "Laster opp", phDone: "Ned · ferdig",
       phPrev: "Forrige test", phAborted: "Avbrutt", phFailed: "Feilet",
       errBanner: "Testen stoppet: {msg} Sjekk at du er på nett og prøv igjen.", errUnknown: "ukjent feil.",
-      errNoDown: "Fikk ikke lastet ned noe.", errNoUp: "Fikk ikke lastet opp noe.", errNetwork: "Nettverksfeil",
+      errReach: "Fikk ikke kontakt med testserveren (speed.cloudflare.com). Den kan være blokkert av en annonseblokker eller et firmanett.", errNoDown: "Fikk ikke lastet ned noe.", errNoUp: "Fikk ikke lastet opp noe.",
 
       gradeBlazing: "Lynrask", gradeFast: "Rask", gradeOk: "Grei", gradeSlow: "Treg", gradeVerySlow: "Veldig treg",
       useWeb: "Surfing og e-post", useHd: "Strømming i HD", use4k: "Strømming i 4K", useCalls: "Videomøter", useGaming: "Gaming", useFiles: "Store filer og backup",
@@ -153,7 +153,7 @@
       phReady: "Ready", phPing: "Measuring ping", phDown: "Downloading", phUp: "Uploading", phDone: "Down · done",
       phPrev: "Previous test", phAborted: "Cancelled", phFailed: "Failed",
       errBanner: "The test stopped: {msg} Check that you're online and try again.", errUnknown: "unknown error.",
-      errNoDown: "Couldn't download anything.", errNoUp: "Couldn't upload anything.", errNetwork: "Network error",
+      errReach: "Couldn't reach the test server (speed.cloudflare.com). It may be blocked by an ad blocker or a company network.", errNoDown: "Couldn't download anything.", errNoUp: "Couldn't upload anything.",
 
       gradeBlazing: "Blazing", gradeFast: "Fast", gradeOk: "OK", gradeSlow: "Slow", gradeVerySlow: "Very slow",
       useWeb: "Browsing and email", useHd: "HD streaming", use4k: "4K streaming", useCalls: "Video calls", useGaming: "Gaming", useFiles: "Large files and backup",

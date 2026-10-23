@@ -1,5 +1,6 @@
-// Nettfart – klient. Måler ping, jitter, nedlasting, opplasting og ping under last mot egen Worker,
-// og lager forslag til fiks ut fra resultatet og hvordan brukeren er koblet til. Tekst kommer fra i18n.js (NO/EN).
+// Nettfart – statisk side (GitHub Pages). Måler ping, jitter, nedlasting, opplasting og ping under last mot
+// Cloudflares offentlige speedtest-endepunkter (de samme som speed.cloudflare.com og biblioteket @cloudflare/speedtest
+// bruker), og lager forslag til fiks ut fra resultatet og hvordan brukeren er koblet til. Tekst kommer fra i18n.js (NO/EN).
 const { t } = Cloud247I18n;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -22,8 +23,11 @@ const store = {
 // Each direction runs 4 parallel streams for 8 s; the first 1.5 s (TCP warm-up) is left out of the result.
 // The caps stop early on very fast lines so a test on mobile data doesn't eat the quota.
 const STREAMS = 4, PHASE_MS = 8000, WARMUP_MS = 1500, PINGS = 16;
-const CAP = { down: 250e6, up: 100e6 }, START = { down: 1e6, up: 256e3 }, MAX = { down: 24e6, up: 8e6 };
+const CAP = { down: 250e6, up: 100e6 }, START = { down: 1e6, up: 128e3 }, MAX = { down: 24e6, up: 8e6 }, GROW_MS = { down: 1500, up: 600 };
 const TICKS = [0, 1, 5, 10, 25, 50, 100, 250, 500, 1000];
+// Every request here must stay a CORS "simple request" (GET, or POST of a type-less Blob, no custom headers),
+// so the browser never needs a preflight that the endpoints might not answer.
+const SPEED = "https://speed.cloudflare.com";
 const CONN_KEY = { wifi: "connWifi", cable: "connCable", mobile: "connMobile" };
 
 let conn = store.get("nf_conn", null) || ({ wifi: "wifi", ethernet: "cable", cellular: "mobile" })[navigator.connection?.type] || "wifi";
@@ -73,10 +77,10 @@ function gauge(state) {
 const progress = f => { $("runBar").style.width = (Math.min(1, f) * 100).toFixed(1) + "%"; };
 
 // ---------- measuring ----------
-// Ping from Resource Timing (request sent → first byte back) when the browser exposes it; that leaves out
-// the browser's own overhead. Falls back to wall-clock time.
+// Ping is an empty download. Resource Timing (request sent → first byte back) leaves out the browser's own
+// overhead when the server allows it (Timing-Allow-Origin); otherwise wall-clock time is used.
 async function ping(signal) {
-  const url = new URL(`/api/ping?r=${rnd()}`, location.href).href;
+  const url = `${SPEED}/__down?bytes=0&r=${rnd()}`;
   const t0 = performance.now();
   const res = await fetch(url, { cache: "no-store", signal });
   await res.arrayBuffer();
@@ -87,7 +91,7 @@ async function ping(signal) {
 }
 
 async function fetchDown(size, add, signal) {
-  const res = await fetch(`/api/down?bytes=${size}&r=${rnd()}`, { cache: "no-store", signal });
+  const res = await fetch(`${SPEED}/__down?bytes=${size}&r=${rnd()}`, { cache: "no-store", signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const rd = res.body.getReader();
   for (;;) {
@@ -97,50 +101,55 @@ async function fetchDown(size, add, signal) {
   }
 }
 
-// XHR because fetch has no upload progress; the progress events give a live reading while each chunk is sent.
+// Upload counts each chunk when the server has received it. (Upload progress events would be smoother, but a
+// listener on xhr.upload makes the request non-simple and triggers a CORS preflight.)
 const blobs = {};
-function xhrUp(size, add, signal) {
-  return new Promise((resolve, reject) => {
-    const x = new XMLHttpRequest();
-    let sent = 0;
-    const off = () => signal.removeEventListener("abort", abort);
-    const abort = () => x.abort();
-    x.upload.onprogress = e => { add(e.loaded - sent); sent = e.loaded; };
-    x.onload = () => { off(); add(Math.max(0, size - sent)); x.status < 400 ? resolve() : reject(new Error(`HTTP ${x.status}`)); };
-    x.onerror = () => { off(); reject(new Error(t("errNetwork"))); };
-    x.onabort = () => { off(); reject(new DOMException("Aborted", "AbortError")); };
-    signal.addEventListener("abort", abort);
-    x.open("POST", `/api/up?r=${rnd()}`);
-    x.send(blobs[size] ||= new Blob([new Uint8Array(size)]));
-  });
+async function fetchUp(size, add, signal) {
+  const started = performance.now();
+  const res = await fetch(`${SPEED}/__up?r=${rnd()}`, { method: "POST", body: blobs[size] ||= new Blob([new Uint8Array(size)]), cache: "no-store", signal });
+  await res.arrayBuffer();
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  add(size, started);
 }
 
-// One direction: parallel streams that keep asking for bigger chunks until the time (or data cap) is up,
-// plus a ping every 300 ms to catch bufferbloat (latency that rises when the line is busy).
+// One direction: parallel streams that keep asking for bigger chunks until the time (or data cap) is up
+// (upload chunks stay shorter, since they only count once they're done), plus a ping every 300 ms to catch
+// bufferbloat (latency that rises when the line is busy).
 async function throughput(dir, signal, onTick) {
   const ctrl = new AbortController(), stop = () => ctrl.abort();
   signal.addEventListener("abort", stop);
-  let total = 0, errors = 0;
-  const add = n => { total += n; if (total >= CAP[dir]) stop(); };
-  const t0 = performance.now(), samples = [[0, 0]], loaded = [];
+  let total = 0, errors = 0, closing = false, drainTimer;
+  // Download counts bytes as they arrive, so it can stop at once. Upload chunks only count when done, so
+  // aborting them would drop bytes already sent: let the ones in flight finish (up to 4 s) instead.
+  const finish = () => {
+    if (closing) return;
+    closing = true;
+    if (dir === "down") stop(); else drainTimer = setTimeout(stop, 4000);
+  };
+  const t0 = performance.now(), samples = [[0, 0]], loaded = [], chunks = [];
+  const add = (n, started) => {
+    total += n;
+    if (started) chunks.push({ s: started - t0, e: performance.now() - t0, n });
+    if (total >= CAP[dir]) finish();
+  };
 
   const stream = async () => {
     let size = START[dir];
-    while (!ctrl.signal.aborted) {
+    while (!ctrl.signal.aborted && !closing) {
       const started = performance.now();
-      try { await (dir === "down" ? fetchDown : xhrUp)(size, add, ctrl.signal); }
+      try { await (dir === "down" ? fetchDown : fetchUp)(size, add, ctrl.signal); }
       catch (e) {
         if (ctrl.signal.aborted) break;
         if (++errors > 8) { stop(); break; }
         await sleep(250, ctrl.signal);
         continue;
       }
-      if (performance.now() - started < 1500) size = Math.min(size * 2, MAX[dir]);
+      if (performance.now() - started < GROW_MS[dir]) size = Math.min(size * 2, MAX[dir]);
     }
   };
   const pinger = async () => {
     await sleep(1000, ctrl.signal);
-    while (!ctrl.signal.aborted) {
+    while (!ctrl.signal.aborted && !closing) {
       try { loaded.push(await ping(ctrl.signal)); } catch { break; }
       await sleep(300, ctrl.signal);
     }
@@ -148,22 +157,32 @@ async function throughput(dir, signal, onTick) {
   const ticker = setInterval(() => {
     const now = performance.now() - t0;
     samples.push([now, total]);
+    // live reading over the last second (two for upload, whose chunks land in bursts)
     let ref = samples[0];
-    for (const s of samples) { if (now - s[0] >= 1000) ref = s; else break; }
+    for (const s of samples) { if (now - s[0] >= (dir === "up" ? 2000 : 1000)) ref = s; else break; }
     onTick(mbit(total - ref[1], now - ref[0]), now / PHASE_MS);
-    if (now >= PHASE_MS) stop();
+    if (now >= PHASE_MS) finish();
   }, 100);
 
   await Promise.all([...Array.from({ length: STREAMS }, stream), pinger()]);
   clearInterval(ticker);
+  clearTimeout(drainTimer);
   signal.removeEventListener("abort", stop);
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
   const end = performance.now() - t0;
   if (!total) throw new Error(t(dir === "down" ? "errNoDown" : "errNoUp"));
   // Fast lines hit the cap before the warm-up is over; then the whole run counts.
-  const from = end > WARMUP_MS * 2 ? samples.find(s => s[0] >= WARMUP_MS) || samples[0] : samples[0];
-  return { mbps: mbit(total - from[1], end - from[0]), bytes: total, loaded: median(loaded), errors };
+  const w = end > WARMUP_MS * 2 ? WARMUP_MS : 0;
+  let bytes;
+  if (dir === "up") {
+    // a finished upload chunk is spread evenly over the time it took; only the part after the warm-up counts
+    bytes = chunks.reduce((sum, c) => sum + c.n * Math.max(0, c.e - Math.max(c.s, w)) / Math.max(1, c.e - c.s), 0);
+  } else {
+    const from = samples.find(s => s[0] >= w) || samples[0];
+    bytes = total - from[1];
+  }
+  return { mbps: mbit(bytes, end - w), bytes: total, loaded: median(loaded), errors };
 }
 
 async function runTest() {
@@ -174,7 +193,9 @@ async function runTest() {
   for (const id of ["sDown", "sUp", "sPing", "sJitter", "sLoaded", "sData"]) $(id).textContent = "–";
   $("grade").hidden = true;
   const r = { at: Date.now(), conn, plan, bytes: 0, errors: 0 };
-  const infoP = fetch("/api/info", { cache: "no-store" }).then(x => x.json()).catch(() => ({}));
+  // Where the test runs (colo, ISP, HTTP version). Optional: the result works without it.
+  const infoP = fetch(`${SPEED}/meta`, { cache: "no-store" }).then(x => x.json())
+    .then(m => ({ colo: m.colo, country: m.country, isp: m.asOrganization, http: m.httpProtocol })).catch(() => ({}));
 
   try {
     // 1. ping and jitter on an idle line (first request warms up the connection and isn't counted)
@@ -217,7 +238,11 @@ async function runTest() {
     showResult(r);
   } catch (e) {
     if (e.name === "AbortError") { gauge({ phase: "phAborted" }); progress(0); }
-    else { gauge({ phase: "phFailed" }); setBanner(t("errBanner", { msg: e.message || t("errUnknown") })); }
+    else {
+      // fetch() rejects with a TypeError when the server can't be reached at all (offline, blocked, CORS)
+      gauge({ phase: "phFailed" });
+      setBanner(t("errBanner", { msg: e instanceof TypeError ? t("errReach") : e.message || t("errUnknown") }));
+    }
     if (last) showResult(last, true);
   } finally {
     running = null;
@@ -452,4 +477,3 @@ setRunning(false);
 renderHistory();
 
 $("year").textContent = new Date().getFullYear();
-fetch("/api/version").then(r => r.json()).then(v => { $("verTxt").textContent = `v${v.version}`; }).catch(() => {});
