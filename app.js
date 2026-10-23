@@ -83,14 +83,18 @@ const progress = f => { $("runBar").style.width = (Math.min(1, f) * 100).toFixed
 
 // ---------- measuring ----------
 // Cloudflare reports its own processing time in Server-Timing; subtracting it leaves the network round trip.
-// (Same parsing as Cloudflare's @cloudflare/speedtest.)
-function serverTime(res) {
+// Read from the header when it's exposed to us (same parsing as Cloudflare's @cloudflare/speedtest), otherwise
+// from Resource Timing's serverTiming, which only needs Timing-Allow-Origin.
+function serverTime(res, entry) {
   const h = res.headers.get("server-timing") || "";
   const m = h.match(/(?:^|,\s*)cfReq(?:uest)?Dur(?:ation)?;\s*dur=([0-9.]+)/i);
   if (m) return +m[1];
   let sum = 0;
   for (const x of h.matchAll(/(?:^|,\s*)cfSpeed[a-zA-Z]*;\s*dur=([0-9.]+)/gi)) sum += +x[1];
-  return sum;
+  if (sum) return sum;
+  const st = entry?.serverTiming || [];
+  const req = st.find(x => /^cfReq(uest)?Dur(ation)?$/i.test(x.name));
+  return req ? req.duration : st.filter(x => /^cfSpeed/i.test(x.name)).reduce((a, x) => a + x.duration, 0);
 }
 const HTTP = { "http/1.1": "HTTP/1.1", h2: "HTTP/2", h3: "HTTP/3" };
 let server = {};  // where the test runs: Cloudflare data centre from the cf-meta-* headers, HTTP version from Resource Timing
@@ -109,7 +113,7 @@ async function ping(signal) {
   const ttfb = e && e.requestStart > 0 && first > e.requestStart ? first - e.requestStart : wall;
   if (res.headers.get("cf-meta-colo")) server = { colo: res.headers.get("cf-meta-colo"), city: res.headers.get("cf-meta-city"), country: res.headers.get("cf-meta-country") };
   if (e?.nextHopProtocol) server.http = HTTP[e.nextHopProtocol] || e.nextHopProtocol.toUpperCase();
-  return Math.max(0, ttfb - serverTime(res));
+  return Math.max(0, ttfb - serverTime(res, e));
 }
 
 async function fetchDown(size, add, signal) {
@@ -286,7 +290,8 @@ function setRunning(on) {
 const setBanner = text => { $("banner").textContent = text; $("banner").hidden = !text; };
 
 function showWhere(r) {
-  const bits = [r.colo && `Cloudflare ${r.colo}`, r.city, r.isp, r.http].filter(Boolean);
+  // the data centre is only known when Cloudflare exposes its cf-meta headers; the test always runs against Cloudflare
+  const bits = [r.colo ? `Cloudflare ${r.colo}` : r.http && "Cloudflare", r.city, r.isp, r.http].filter(Boolean);
   $("where").textContent = bits.length ? bits.join(" · ") : "–";
 }
 
@@ -305,8 +310,9 @@ function showResult(r, keepGauge) {
   $("sUp").textContent = fmtSpeed(r.up);
   $("sPing").textContent = fmtMs(r.ping);
   $("sJitter").textContent = fmtMs(r.jitter);
-  const ld = Math.max(r.loadedDown || 0, r.loadedUp || 0);
-  $("sLoaded").innerHTML = ld ? `${fmtMs(ld)}<small>ms</small>` : "–";
+  // ping while downloading / uploading, shown side by side like speedtest.net
+  const ld = [r.loadedDown, r.loadedUp].map(v => v ? fmtMs(v) : "–").join("/");
+  $("sLoaded").innerHTML = r.loadedDown || r.loadedUp ? `${ld}<small>ms</small>` : "–";
   $("sData").textContent = fmtMB(r.bytes);
   $("grade").textContent = t(grade(r));
   $("grade").hidden = false;
