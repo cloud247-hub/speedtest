@@ -4,10 +4,6 @@
   const messages = {
     no: {
       metaDescription: "Nettfart fra Cloud247: test hvor raskt nettet ditt er, og få konkrete forslag til hva du kan gjøre når det går tregt.",
-      network: "NETTVERK",
-      heroTitle: "Test nettet ditt.", heroTagline: "Fiks det som er tregt.",
-      heroDescription: "Mål nedlasting, opplasting, ping og stabilitet på under et halvt minutt. Går noe tregt, får du konkrete forslag til hva du kan gjøre, tilpasset Wi‑Fi, kabel eller mobilnett.",
-      tagFree: "Gratis, ingen konto", tagLocal: "Resultatene lagres bare på enheten", tagCloudflare: "Måles mot Cloudflare",
       measure: "MÅLING", runTitle: "Start testen", gaugeLabel: "Fartsmåler",
       startTest: "Start test", testAgain: "Test på nytt", cancel: "Avbryt", server: "Server",
       viewLabel: "Visning", viewGauge: "Måler", viewGraph: "Graf",
@@ -139,10 +135,6 @@
     },
     en: {
       metaDescription: "Nettfart by Cloud247: test how fast your connection is, and get concrete suggestions for what to do when it's slow.",
-      network: "NETWORK",
-      heroTitle: "Test your connection.", heroTagline: "Fix what's slow.",
-      heroDescription: "Measure download, upload, ping and stability in under half a minute. If something is slow, you get concrete suggestions for what to do, tailored to Wi‑Fi, cable or mobile.",
-      tagFree: "Free, no account", tagLocal: "Results are stored only on your device", tagCloudflare: "Measured against Cloudflare",
       measure: "TEST", runTitle: "Run the test", gaugeLabel: "Speed gauge",
       startTest: "Start test", testAgain: "Test again", cancel: "Cancel", server: "Server",
       viewLabel: "View", viewGauge: "Gauge", viewGraph: "Graph",

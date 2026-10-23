@@ -18,7 +18,7 @@
 <title>Nettfart | Cloud247</title>
 <style>
 /* Cloud247 profile (same as cloud247.no and the other Cloud Toolbox tools): navy/yellow palette, Inter/system type,
-   navy header + hero, numbered white panels, a navy card for the live value, navy footer with the version. */
+   navy header, numbered white panels, a navy card for the live value, navy footer with the version. */
 :root{--navy:#061a2f;--navy2:#0a2745;--yellow:#fad63a;--yellow2:#f1c400;--yellow-soft:#fff9df;--sky:#7cc4fa;
   --ink:#172033;--muted:#667085;--line:#e4e8ee;--bg:#f6f8fa;--surface:#fff;--success:#157347;--danger:#b42318;
   --radius:22px;--shadow:0 18px 55px rgba(6,26,47,.10);
@@ -58,30 +58,11 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #b18c
 @media(max-width:420px){.language-switcher button{min-width:29px;padding:0 5px;font-size:.68rem}}
 @media(max-width:620px){.site-header .header-inner{width:calc(100% - 28px);min-height:72px;justify-content:center}.cloud-brand{width:180px}}
 
-/* ---- hero ---- */
-.hero{overflow:hidden;background:radial-gradient(ellipse at 85% 40%,rgba(250,214,58,.075),transparent 40%),linear-gradient(180deg,var(--navy),#071f38);color:#fff}
-.hero-inner{display:flex;justify-content:space-between;align-items:center;gap:50px;padding-block:53px 58px}
-.hero-copy{max-width:760px}
+/* ---- panels ---- */
 .eyebrow,.kicker{margin:0 0 10px;font-size:.69rem;font-weight:850;letter-spacing:.16em}
 .eyebrow{color:var(--yellow)}
-.eyebrow>span[aria-hidden]{padding-inline:10px;color:#50616f}
 .kicker{color:#816500}
-.hero h1{margin:0;font-size:clamp(2.75rem,5.2vw,4.55rem);line-height:1.03;letter-spacing:-.052em;font-weight:820}
-.hero h1 .secondary{font-weight:450}
-.hero-description{font-size:1.08rem;color:#c8d2dc;max-width:650px;margin:22px 0}
-.hero-tags{display:flex;align-items:center;flex-wrap:wrap;gap:10px 22px;color:#b8c7d4;font-size:.73rem}
-.hero-tags>span{display:inline-flex;align-items:center;gap:7px}
-.hero-tags>span:not(:first-child):before{content:"";height:3px;width:3px;border-radius:100%;background:#697c8e}
-.tiny-dot{display:inline-block;width:6px;height:6px;flex-shrink:0;background:#54c896;border-radius:50%}
-.hero-art{width:208px;height:208px;flex:0 0 208px;position:relative;display:grid;place-items:center}
-.orbit{position:absolute;inset:0;border:1px solid rgba(250,214,58,.10);border-radius:50%}
-.orbit-two{inset:23px;border-color:rgba(250,214,58,.12)}
-.emblem{width:115px;height:115px;background:rgba(250,214,58,.07);border:1px solid rgba(250,214,58,.25);border-radius:30px;display:grid;place-items:center;transform:rotate(-8deg);color:var(--yellow)}
-.emblem svg{width:62px;height:62px;transform:rotate(8deg)}
-.art-label{position:absolute;bottom:0;background:#152b3b;border:1px solid #354650;color:#d5dfd9;border-radius:8px;padding:8px 12px;font:700 9px/1.1 var(--mono);letter-spacing:.12em;display:flex;gap:8px;align-items:center;white-space:nowrap}
-
-/* ---- panels ---- */
-.test-section{padding:38px 0 36px}
+.test-section{padding:32px 0 36px}
 .test-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:24px;align-items:start}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px;box-shadow:0 2px 0 rgba(6,26,47,.02);min-width:0}
 .panel-heading{display:flex;align-items:center;gap:12px;margin-bottom:24px}
@@ -237,19 +218,12 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
 .footer-version span{margin-left:8px;padding:3px 6px;border:1px solid #2e4257;border-radius:5px}
 
 @media(max-width:1049px){
-  .hero-art{width:168px;height:168px;flex-basis:168px}
-  .hero h1{font-size:3.5rem}
   .panel{padding:23px}
   .uses{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:860px){.sugs{grid-template-columns:1fr}}
 @media(max-width:760px){
   .shell{width:calc(100% - 32px)}
-  .hero-inner{padding-block:39px 40px}
-  .hero h1{font-size:clamp(2.1rem,8.5vw,3.6rem)}
-  .hero-art{display:none}
-  .hero-description{font-size:.95rem}
-  .hero-tags{font-size:.67rem;gap:9px 14px}
   .test-section{padding-top:22px}
   .test-grid{grid-template-columns:1fr;gap:18px}
   .panel{padding:20px}
@@ -290,26 +264,6 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
 </header>
 
 <main>
-  <section class="hero">
-    <div class="shell hero-inner">
-      <div class="hero-copy">
-        <p class="eyebrow">CLOUD TOOLBOX <span aria-hidden="true">/</span> <span data-i18n="network">NETTVERK</span></p>
-        <h1><span data-i18n="heroTitle">Test nettet ditt.</span><br> <span class="secondary" data-i18n="heroTagline">Fiks det som er tregt.</span></h1>
-        <p class="hero-description" data-i18n="heroDescription">Mål nedlasting, opplasting, ping og stabilitet på under et halvt minutt. Går noe tregt, får du konkrete forslag til hva du kan gjøre, tilpasset Wi‑Fi, kabel eller mobilnett.</p>
-        <div class="hero-tags">
-          <span><span class="tiny-dot" aria-hidden="true"></span><span data-i18n="tagFree">Gratis, ingen konto</span></span>
-          <span data-i18n="tagLocal">Resultatene lagres bare på enheten</span>
-          <span data-i18n="tagCloudflare">Måles mot Cloudflare</span>
-        </div>
-      </div>
-      <div class="hero-art" aria-hidden="true">
-        <div class="orbit"></div><div class="orbit orbit-two"></div>
-        <div class="emblem"><svg viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M21.6 64.4A26 26 0 1 1 58.4 64.4" stroke-width="6" opacity=".28"/><path d="M21.6 64.4A26 26 0 1 1 62.5 33" stroke-width="6"/><path d="M40 46 53.9 38" stroke-width="4"/><circle cx="40" cy="46" r="4.5" fill="currentColor" stroke="none"/></svg></div>
-        <div class="art-label"><span class="tiny-dot"></span>CLOUDFLARE EDGE</div>
-      </div>
-    </div>
-  </section>
-
   <section class="test-section">
     <div class="shell test-grid">
       <section class="panel" aria-labelledby="meterTitle">
@@ -406,9 +360,9 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
   </section>
 </main>
 
-<footer><div class="shell footer-inner"><span>&copy; <span id="year">2026</span> Cloud247</span><span class="footer-version">Nettfart <span id="verTxt">v1.5.1</span></span><a href="https://cloud247.no/">cloud247.no <span aria-hidden="true">&nearr;</span></a></div></footer>
+<footer><div class="shell footer-inner"><span>&copy; <span id="year">2026</span> Cloud247</span><span class="footer-version">Nettfart <span id="verTxt">v1.5.2</span></span><a href="https://cloud247.no/">cloud247.no <span aria-hidden="true">&nearr;</span></a></div></footer>
 
-<script src="i18n.js?v=1.5.1"></script>
-<script src="app.js?v=1.5.1"></script>
+<script src="i18n.js?v=1.5.2"></script>
+<script src="app.js?v=1.5.2"></script>
 </body>
 </html>
