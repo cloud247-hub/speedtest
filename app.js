@@ -40,7 +40,7 @@ const CONN_KEY = { wifi: "connWifi", cable: "connCable", mobile: "connMobile" };
 let conn = store.get("nf_conn", null) || ({ wifi: "wifi", ethernet: "cable", cellular: "mobile" })[navigator.connection?.type] || "wifi";
 let plan = store.get("nf_plan", null);
 let saver = store.get("nf_saver", false);
-let view = store.get("nf_view", "gauge") === "graph" ? "graph" : "gauge";
+let view = ["graph", "cover"].includes(store.get("nf_view", "gauge")) ? store.get("nf_view", "gauge") : "gauge";
 // What the graph draws: seconds since the test started → Mbit/s per direction, every ping with its phase,
 // and when each phase ran. Saved with the result (rounded), so a past test can be drawn again.
 let series = null;
@@ -236,6 +236,7 @@ async function throughput(dir, signal, { capped, onTick, onPing }) {
 }
 
 async function runTest() {
+  stopCov();
   const ctrl = new AbortController();
   running = ctrl;
   setRunning(true);
@@ -316,12 +317,14 @@ async function runTest() {
   }
 }
 
-function setRunning(on) {
-  $("startBtn").classList.toggle("stop", on);
-  $("startTxt").textContent = t(on ? "cancel" : last ? "testAgain" : "startTest");
-  $("startBtn").querySelector("svg").toggleAttribute("hidden", on);
-  $("saverIn").disabled = on;
-  $("shareBtn").hidden = on || !last;
+// The big button runs the speed test, or (in the coverage view) starts and stops the coverage walk.
+function setRunning() {
+  const busy = !!running || (view === "cover" && !!cov);
+  $("startBtn").classList.toggle("stop", busy);
+  $("startTxt").textContent = t(running ? "cancel" : view === "cover" ? (cov ? "covStop" : "covStart") : last ? "testAgain" : "startTest");
+  $("startBtn").querySelector("svg").toggleAttribute("hidden", busy);
+  $("saverIn").disabled = !!running || !!cov;
+  $("shareBtn").hidden = !!running || !last;
 }
 const setBanner = text => { $("banner").textContent = text; $("banner").hidden = !text; };
 
@@ -374,7 +377,7 @@ function drawChart() {
     g += `<text class="bandlbl" x="${(a + 4).toFixed(1)}" y="${AT - 5}">${esc(t(dir))}</text>`;
   }
   // speed grid + axis
-  g += `<text class="ttl" x="0" y="${AT - 5}">${esc(t("chartSpeed").split(" · ")[1])}</text>`;
+  g += `<text class="ttl" x="0" y="${AT - 9}">${esc(t("chartSpeed").split(" · ")[1])}</text>`;
   for (const v of [0, vMax / 2, vMax]) {
     g += `<line class="grid" x1="${PL}" x2="${CW - PR}" y1="${ya(v).toFixed(1)}" y2="${ya(v).toFixed(1)}"/>`;
     g += `<text class="axis" x="${PL - 9}" y="${(ya(v) + 3).toFixed(1)}" text-anchor="end">${esc(fmtSpeed(v))}</text>`;
@@ -396,7 +399,7 @@ function drawChart() {
     g += `<line class="grid" x1="${PL}" x2="${CW - PR}" y1="${yb(v).toFixed(1)}" y2="${yb(v).toFixed(1)}"/>`;
     g += `<text class="axis" x="${PL - 9}" y="${(yb(v) + 3).toFixed(1)}" text-anchor="end">${esc(fmtMs(v))}</text>`;
   }
-  g += `<text class="ttl" x="0" y="${BT - 6}">${esc(t("chartPing"))}</text>`;
+  g += `<text class="ttl" x="0" y="${BT - 10}">${esc(t("chartPing"))}</text>`;
   for (const [px, pv, ph] of sr.ping) g += `<circle class="dot" cx="${x(px).toFixed(1)}" cy="${yb(pv).toFixed(1)}" r="2.6" fill="${COLOR[ph]}"/>`;
   // time axis
   const step = tMax > 30 ? 8 : tMax > 14 ? 4 : 2;
@@ -443,10 +446,218 @@ function setView(v) {
   store.set("nf_view", v);
   for (const b of $("viewTabs").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.view === v));
   $("meter").classList.toggle("graph", v === "graph");
+  $("meter").classList.toggle("cover", v === "cover");
   $("chartWrap").hidden = v !== "graph";
+  $("covWrap").hidden = $("covTools").hidden = v !== "cover";
+  $("runHelp").hidden = v === "cover";
+  setRunning();
   drawChart();
+  drawCov();
 }
 $("viewTabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setView(b.dataset.view); });
+
+// ---------- coverage walk ----------
+// The browser can't read the Wi‑Fi signal, so coverage is measured by what it causes: a ping twice a second
+// (lost pings count) and, unless «Spar data» is on, a short download every other second sized to take ~0.3 s.
+// The user walks around and marks spots; a spot is the median of the last few seconds.
+const COV_SPAN = 90, SPOT_SECS = 6, ROOMS = ["roomLiving", "roomKitchen", "roomBedroom", "roomOffice", "roomBath", "roomHall", "roomUp", "roomOut"];
+let cov = null;   // { ctrl, t0, pts: [[sec, mbps|null, ms|null]], marks: [[sec, name]], bytes, lock }
+let lastCov = null;  // the finished walk stays on screen until a new one starts
+let spots = store.get("nf_spots", []);
+const covSec = () => (performance.now() - cov.t0) / 1000;
+
+// abort a single request after `ms`, or when the walk stops (a dead spot can leave a request hanging)
+async function timed(signal, ms, fn) {
+  const c = new AbortController(), stop = () => c.abort();
+  const timer = setTimeout(stop, ms);
+  signal.addEventListener("abort", stop, { once: true });
+  try { return await fn(c.signal); } finally { clearTimeout(timer); signal.removeEventListener("abort", stop); }
+}
+
+// A short download timed from its first to its last byte (Resource Timing), so the round trip and the
+// server's start-up don't count; a short probe on one connection still reads lower than the full test.
+async function probe(size, add, signal) {
+  const url = `${SPEED}/__down?bytes=${size}&r=${rnd()}`, t0 = performance.now();
+  const res = await fetch(url, { cache: "no-store", signal });
+  if (!res.ok) throw httpError(res);
+  const rd = res.body.getReader();
+  for (;;) { const { done, value } = await rd.read(); if (done) break; add(value.byteLength); }
+  const e = performance.getEntriesByName(url).pop();
+  performance.clearResourceTimings();
+  const ms = e && e.responseEnd > e.responseStart && e.responseStart > 0 ? e.responseEnd - e.responseStart : performance.now() - t0;
+  return mbit(size, Math.max(1, ms));
+}
+
+async function covLoop(c) {
+  let size = 512e3, nextProbe = 0;
+  while (!c.ctrl.signal.aborted) {
+    let ms = null, mbps = null;
+    try { ms = await timed(c.ctrl.signal, 2000, ping); } catch {}
+    if (c.ctrl.signal.aborted) break;
+    if (!saver && covSec() >= nextProbe) {
+      nextProbe = covSec() + 2;
+      try {
+        mbps = await timed(c.ctrl.signal, 4000, sig => probe(size, n => { c.bytes += n; }, sig));
+        size = Math.min(24e6, Math.max(256e3, mbps * 1e6 / 8 * .3));
+      } catch { size = 256e3; }
+      if (c.ctrl.signal.aborted) break;
+    }
+    c.pts.push([covSec(), mbps, ms]);
+    updateCovNow();
+    drawCov();
+    await sleep(ms == null ? 200 : 450, c.ctrl.signal);
+  }
+}
+
+async function startCov() {
+  if (cov || running) return;
+  cov = { ctrl: new AbortController(), t0: performance.now(), pts: [], marks: [], bytes: 0, lock: null };
+  try { cov.lock = await navigator.wakeLock?.request("screen"); } catch {}
+  setRunning();
+  updateCovNow();
+  drawCov();
+  covLoop(cov);
+}
+function stopCov() {
+  if (!cov) return;
+  cov.ctrl.abort();
+  cov.lock?.release?.().catch(() => {});
+  lastCov = cov;
+  cov = null;
+  setRunning();
+  updateCovNow();
+  drawCov();
+}
+// the screen lock is dropped when the page is hidden; take it again when the user comes back
+document.addEventListener("visibilitychange", async () => {
+  if (cov && document.visibilityState === "visible" && (!cov.lock || cov.lock.released)) try { cov.lock = await navigator.wakeLock?.request("screen"); } catch {}
+});
+
+// a spot (or the "now" readout): medians over the last few seconds of the walk
+function recent(c, secs) {
+  const end = c.pts.at(-1)?.[0] ?? 0, pts = c.pts.filter(p => p[0] >= end - secs);
+  const pings = pts.map(p => p[2]).filter(v => v != null), speeds = pts.map(p => p[1]).filter(v => v != null);
+  const jitter = pings.length > 1 ? pings.slice(1).reduce((a, v, i) => a + Math.abs(v - pings[i]), 0) / (pings.length - 1) : null;
+  return { n: pings.length, down: speeds.length ? median(speeds) : null, ping: median(pings), jitter, loss: pts.length ? pts.filter(p => p[2] == null).length / pts.length : 0 };
+}
+// 3 excellent, 2 good, 1 weak, 0 poor
+function quality(sp) {
+  if (sp.loss > .1 || !(sp.ping <= 100) || (sp.down != null && sp.down < 5)) return 0;
+  if (sp.loss > 0 || sp.ping > 40 || sp.jitter > 20 || (sp.down != null && sp.down < 20)) return 1;
+  if (sp.ping > 20 || (sp.down != null && sp.down < 75)) return 2;
+  return 3;
+}
+const Q_KEY = ["qPoor", "qWeak", "qGood", "qGreat"];
+
+function updateCovNow() {
+  const c = cov || lastCov;
+  $("covPhase").textContent = t(cov ? "covLive" : "covPhase");
+  const w = c && c.pts.length ? recent(c, 3) : null;
+  $("covNow").textContent = w && w.n ? `${w.down != null ? fmtSpeed(w.down) + " Mbit/s · " : ""}${fmtMs(w.ping)} ms` : "–";
+  const secs = c && c.pts.length ? Math.round(c.pts.at(-1)[0]) : 0;
+  $("covMeta").textContent = c ? t("covMeta", { time: `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`, data: fmtMB(c.bytes) }) : "";
+  const ready = !!cov && recent(cov, SPOT_SECS).n >= 3;
+  $("markBtn").disabled = !ready;
+  for (const b of $("spotChips").querySelectorAll("button")) b.disabled = !ready;
+}
+
+function markSpot(name) {
+  name = String(name || "").trim().slice(0, 30);
+  if (!cov || !name) return;
+  const w = recent(cov, SPOT_SECS);
+  if (w.n < 3) return setBanner(t("covNeedMore"));
+  cov.marks.push([covSec(), name]);
+  spots = [{ name, at: Date.now(), down: w.down == null ? null : r1(w.down), ping: r1(w.ping), jitter: w.jitter == null ? null : r1(w.jitter), loss: r2(w.loss) },
+    ...spots.filter(s => s.name.toLowerCase() !== name.toLowerCase())].slice(0, 30);
+  store.set("nf_spots", spots);
+  $("spotName").value = "";
+  renderSpots();
+  drawCov();
+}
+
+function renderChips() {
+  $("spotChips").innerHTML = ROOMS.map(k => `<button type="button" class="chip" data-room="${k}">${esc(t(k))}</button>`).join("");
+  updateCovNow();
+}
+
+function renderSpots() {
+  $("spotsHead").hidden = !spots.length;
+  // best first: by speed when it was measured, otherwise by ping
+  const list = [...spots].sort((a, b) => quality(b) - quality(a) || (b.down ?? 0) - (a.down ?? 0) || a.ping - b.ping);
+  const best = Math.max(1, ...list.map(s => s.down ?? 0));
+  $("spots").innerHTML = list.map(s => {
+    const q = quality(s);
+    const val = [s.down != null && `${fmtSpeed(s.down)} Mbit/s`, `${t("ping")} ${fmtMs(s.ping)} ms`, s.jitter != null && `${t("jitter")} ${fmtMs(s.jitter)} ms`, s.loss > 0 && t("spotLoss", { pct: Math.round(s.loss * 100) })].filter(Boolean).join(" · ");
+    return `<li class="spot"><span class="nm">${esc(s.name)}</span><span class="q q${q}">${esc(t(Q_KEY[q]))}</span>${s.down != null ? `<span class="bar" aria-hidden="true"><i style="width:${Math.max(2, s.down / best * 100).toFixed(1)}%"></i></span>` : ""}<span class="val">${esc(val)}</span></li>`;
+  }).join("");
+  const sum = [];
+  if (list.length) sum.push(t("covBest", { name: list[0].name }));
+  if (list.length > 1 && quality(list.at(-1)) <= 1) sum.push(t("covWeakTip", { name: list.at(-1).name, best: list[0].name }));
+  else if (list.length > 1) sum.push(t("covAllGood"));
+  $("covSummary").textContent = sum.join(" ");
+}
+
+// rolling graph of the last 90 s: speed probes on top, pings (and lost pings) below, marked spots as lines
+function drawCov() {
+  if (view !== "cover") return;
+  const c = cov || lastCov;
+  const has = !!c && c.pts.length > 0;
+  $("covEmpty").hidden = has;
+  $("covSvg").toggleAttribute("hidden", !has);
+  if (!has) return;
+  const end = c.pts.at(-1)[0], t1 = Math.max(COV_SPAN, end), t0 = t1 - COV_SPAN;
+  const x = v => PL + (CW - PL - PR) * (v - t0) / COV_SPAN;
+  const pts = c.pts.filter(p => p[0] >= t0);
+  const speeds = pts.filter(p => p[1] != null), pings = pts.filter(p => p[2] != null);
+  const vMax = niceMax(Math.max(...speeds.map(p => p[1]), 1)), pMax = niceMax(Math.max(...pings.map(p => p[2]), 1));
+  const ya = v => AT + AH - AH * Math.min(v, vMax) / vMax, yb = v => BT + BH - BH * Math.min(v, pMax) / pMax;
+  let g = `<text class="ttl" x="0" y="${AT - 9}">${esc(t("chartSpeed").split(" · ")[1])}</text>`;
+  for (const v of [0, vMax / 2, vMax]) {
+    g += `<line class="grid" x1="${PL}" x2="${CW - PR}" y1="${ya(v).toFixed(1)}" y2="${ya(v).toFixed(1)}"/>`;
+    g += `<text class="axis" x="${PL - 9}" y="${(ya(v) + 3).toFixed(1)}" text-anchor="end">${esc(fmtSpeed(v))}</text>`;
+  }
+  // speed line, broken where probes are missing (failed, or more than 6 s apart)
+  let d = "";
+  speeds.forEach((p, i) => { d += `${i && p[0] - speeds[i - 1][0] <= 6 ? "L" : "M"}${x(p[0]).toFixed(1)} ${ya(p[1]).toFixed(1)}`; });
+  if (d) g += `<path class="line down" d="${d}"/>`;
+  if (speeds.length) { const p = speeds.at(-1); g += `<circle class="end" cx="${x(p[0]).toFixed(1)}" cy="${ya(p[1]).toFixed(1)}" r="4" fill="var(--yellow)"/>`; }
+  g += `<text class="ttl" x="0" y="${BT - 10}">${esc(t("chartPing"))}</text>`;
+  for (const v of [0, pMax]) {
+    g += `<line class="grid" x1="${PL}" x2="${CW - PR}" y1="${yb(v).toFixed(1)}" y2="${yb(v).toFixed(1)}"/>`;
+    g += `<text class="axis" x="${PL - 9}" y="${(yb(v) + 3).toFixed(1)}" text-anchor="end">${esc(fmtMs(v))}</text>`;
+  }
+  for (const p of pts) {
+    const px = x(p[0]).toFixed(1);
+    g += p[2] == null
+      ? `<path class="lost" d="M${px - 3} ${BT - 3}l6 6m0 -6l-6 6"/>`
+      : `<circle class="dot" cx="${px}" cy="${yb(p[2]).toFixed(1)}" r="2.4" fill="#8fa7bb"/>`;
+  }
+  // spot names on two rows above/inside the top of the plot; a name that fits on neither keeps just its line
+  const rowEnd = [-Infinity, -Infinity];
+  for (const [mx, name] of c.marks.filter(m => m[0] >= t0)) {
+    const px = x(mx), label = name.length > 12 ? name.slice(0, 11) + "…" : name, w = label.length * 5.4;
+    const lx = Math.min(CW - PR - w / 2, Math.max(PL + w / 2, px));
+    g += `<line class="mark" x1="${px.toFixed(1)}" x2="${px.toFixed(1)}" y1="${AT}" y2="${BT + BH}"/>`;
+    const row = rowEnd.findIndex(e => lx - w / 2 > e + 4);
+    if (row < 0) continue;
+    rowEnd[row] = lx + w / 2;
+    g += `<text class="marklbl" x="${lx.toFixed(1)}" y="${row ? AT + 8 : AT - 4}" text-anchor="middle">${esc(label)}</text>`;
+  }
+  // time axis as minutes:seconds since the walk started
+  for (let v = Math.ceil(t0 / 15) * 15; v <= t1 + .01; v += 15) g += `<text class="axis" x="${x(v).toFixed(1)}" y="${BT + BH + 14}" text-anchor="middle">${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, "0")}</text>`;
+  $("covSvg").innerHTML = g;
+  $("covSvg").setAttribute("aria-label", t("covAria", { sec: COV_SPAN }));
+}
+
+$("markBtn").addEventListener("click", () => $("spotName").value.trim() ? markSpot($("spotName").value) : $("spotName").focus());
+$("spotName").addEventListener("keydown", e => { if (e.key === "Enter" && !$("markBtn").disabled) $("markBtn").click(); });
+$("spotChips").addEventListener("click", e => { const b = e.target.closest("button"); if (b && !b.disabled) markSpot(t(b.dataset.room)); });
+$("spotsClear").addEventListener("click", () => {
+  if (!confirm(t("confirmSpots"))) return;
+  spots = [];
+  store.set("nf_spots", spots);
+  renderSpots();
+});
 
 // ---------- results ----------
 function grade(r) {
@@ -614,7 +825,11 @@ function summary(r) {
 }
 
 // ---------- events ----------
-$("startBtn").addEventListener("click", () => running ? running.abort() : runTest());
+$("startBtn").addEventListener("click", () => {
+  if (running) running.abort();
+  else if (view === "cover") cov ? stopCov() : startCov();
+  else runTest();
+});
 
 function setConn(c) {
   conn = c;
@@ -656,12 +871,17 @@ document.querySelectorAll("[data-language]").forEach(b => b.addEventListener("cl
 Cloud247I18n.onChange(() => {
   gauge(gaugeState);
   drawChart();
+  drawCov();
+  renderChips();
+  renderSpots();
   setRunning(!!running);
   if (last && !running) showResult(last, true);
   else { renderAdvice(); renderHistory(); }
 });
 
 Cloud247I18n.apply();
+renderChips();
+renderSpots();
 setView(view);
 setConn(conn);
 gauge({});

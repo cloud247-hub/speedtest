@@ -119,7 +119,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #b18c
 .number-unit input{width:92px;border:1px solid #ccd3dc;background:#fff;border-radius:9px;padding:8px 8px 8px 10px;font-size:1.04rem;font-weight:800;color:var(--navy)}
 .number-unit input::placeholder{color:#a3acb9;font-weight:500}
 /* view switch (gauge / graph) and the graph: speed over time on top, ping (other unit, own scale) below */
-.view-tabs{grid-template-columns:repeat(2,1fr);margin-bottom:14px}
+.view-tabs{grid-template-columns:repeat(3,1fr);margin-bottom:14px}
 .chart{position:relative;width:100%;max-width:400px;display:flex;flex-direction:column;gap:8px}
 .chart-head{margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:10px;color:var(--yellow);font-size:.62rem;font-weight:850;letter-spacing:.16em;text-transform:uppercase}
 .meter.up .chart-head{color:var(--sky)}
@@ -130,23 +130,55 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #b18c
 .chart-legend .sw-down{border-color:var(--yellow)}
 .chart-legend .sw-up{border-color:var(--sky);border-top-style:dashed}
 .chart-legend .sw-idle{width:6px;height:6px;border:0;border-radius:50%;background:#8fa7bb}
-#chartSvg{width:100%;height:auto;display:block;overflow:visible;touch-action:pan-y}
-#chartSvg .grid{stroke:rgba(255,255,255,.08);stroke-width:1}
-#chartSvg .axis{fill:#8fa7bb;font:500 9.5px var(--mono)}
-#chartSvg .ttl{fill:#8fa7bb;font-size:9px;font-weight:850;letter-spacing:.12em;text-transform:uppercase}
-#chartSvg .band{fill:rgba(255,255,255,.035)}
-#chartSvg .bandlbl{fill:#8fa7bb;font-size:8.5px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}
-#chartSvg .line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-#chartSvg .down{stroke:var(--yellow)} #chartSvg .up{stroke:var(--sky);stroke-dasharray:5 3}
-#chartSvg .end{stroke:var(--navy);stroke-width:2}
-#chartSvg .endlbl{fill:#fff;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums}
-#chartSvg .dot{stroke:var(--navy);stroke-width:1}
-#chartSvg .cross{stroke:rgba(255,255,255,.45);stroke-width:1;stroke-dasharray:2 2}
+.plot{width:100%;height:auto;display:block;overflow:visible;touch-action:pan-y}
+.plot .grid{stroke:rgba(255,255,255,.08);stroke-width:1}
+.plot .axis{fill:#8fa7bb;font:500 9.5px var(--mono)}
+.plot .ttl{fill:#8fa7bb;font-size:9px;font-weight:850;letter-spacing:.12em;text-transform:uppercase}
+.plot .band{fill:rgba(255,255,255,.035)}
+.plot .bandlbl{fill:#8fa7bb;font-size:8.5px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}
+.plot .line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.plot .down{stroke:var(--yellow)} .plot .up{stroke:var(--sky);stroke-dasharray:5 3}
+.plot .end{stroke:var(--navy);stroke-width:2}
+.plot .endlbl{fill:#fff;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums}
+.plot .dot{stroke:var(--navy);stroke-width:1}
+.plot .cross{stroke:rgba(255,255,255,.45);stroke-width:1;stroke-dasharray:2 2}
 .chart-tip{position:absolute;top:58px;transform:translateX(-50%);pointer-events:none;background:#fff;color:var(--ink);border-radius:9px;padding:6px 9px;font-size:.7rem;line-height:1.45;box-shadow:var(--shadow);white-space:nowrap;z-index:2}
 .chart-tip b{font-variant-numeric:tabular-nums}
 .chart-tip i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
 .chart-empty{margin:0;color:#8fa7bb;font-size:.78rem;text-align:center;padding:4px 0 2px}
-.meter.graph .gauge{display:none}
+.meter.graph .gauge,.meter.cover .gauge,.meter.cover .runbar,.meter.cover .where{display:none}
+.chart-legend .sw-lost{width:8px;height:8px;border:0;background:none;position:relative}
+.chart-legend .sw-lost:before,.chart-legend .sw-lost:after{content:"";position:absolute;left:3px;top:-1px;width:2px;height:10px;background:#ff8a7a;transform:rotate(45deg)}
+.chart-legend .sw-lost:after{transform:rotate(-45deg)}
+.plot .lost{stroke:#ff8a7a;stroke-width:2;stroke-linecap:round}
+.plot .mark{stroke:rgba(255,255,255,.55);stroke-width:1;stroke-dasharray:3 3}
+.plot .marklbl{fill:#fff;font-size:9px;font-weight:700}
+.cov-meta{margin:0;color:#8fa7bb;font:500 .66rem var(--mono);text-align:right}
+/* coverage walk: mark spots, then the spots ranked best to worst */
+.cov-tools{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.cov-mark{display:flex;gap:8px}
+.cov-mark input{flex:1;min-width:0;border:1px solid #ccd3dc;background:#fff;border-radius:9px;padding:10px 12px;font-size:16px;color:var(--ink)}
+.cov-mark .secondary-button{width:auto;margin:0;flex:none;min-height:44px}
+.cov-mark .secondary-button:disabled{opacity:.45;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:#fff;color:#5b6574;border:1px solid #dce1e7;border-radius:7px;padding:6px 10px;font-size:.74rem;font-weight:650;min-height:32px}
+.chip:hover:not(:disabled){background:var(--yellow-soft);border-color:#dbc869;color:#695514}
+.chip:disabled{opacity:.45;cursor:default}
+.spots-head{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px}
+.spots-head h3{margin:0;font-size:1rem;letter-spacing:-.02em}
+.spots{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.spot{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 10px;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.spot .nm{font-weight:720;font-size:.88rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spot .q{display:inline-flex;align-items:center;gap:6px;border-radius:7px;padding:4px 8px;font-size:.6rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;border:1px solid}
+.spot .q:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.spot .q3,.spot .q2{color:#28764f;background:#edf7f1;border-color:#d5e9dc}
+.spot .q1{color:#695514;background:var(--yellow-soft);border-color:#e8d783}
+.spot .q0{color:var(--danger);background:#fff1ef;border-color:#f4cbc5}
+.spot .bar{grid-column:1/-1;height:6px;border-radius:4px;background:#eef1f5;overflow:hidden}
+.spot .bar i{display:block;height:100%;border-radius:0 4px 4px 0;background:var(--yellow2)}
+.spot .val{grid-column:1/-1;color:var(--muted);font:500 .72rem var(--mono)}
+.cov-summary{margin:0;font-size:.84rem;line-height:1.6}
+.cov-summary:empty{display:none}
 
 /* on/off switch, same as the other Cloud Toolbox tools */
 .switch-row{position:relative;display:flex;align-items:center;gap:12px;justify-content:space-between;padding:15px 0 0;margin-top:16px;border-top:1px solid var(--line);cursor:pointer}
@@ -271,6 +303,7 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
         <div class="mode-tabs view-tabs" id="viewTabs" role="group" data-i18n-aria="viewLabel" aria-label="Visning">
           <button type="button" data-view="gauge" aria-pressed="true" data-i18n="viewGauge">Måler</button>
           <button type="button" data-view="graph" aria-pressed="false" data-i18n="viewGraph">Graf</button>
+          <button type="button" data-view="cover" aria-pressed="false" data-i18n="viewCover">Dekning</button>
         </div>
         <div class="meter" id="meter">
           <div class="chart" id="chartWrap" hidden>
@@ -280,9 +313,20 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
               <span><i class="sw-up"></i><span data-i18n="up">Opp</span></span>
               <span><i class="sw-idle"></i><span data-i18n="pingIdle">Ping i ro</span></span>
             </div>
-            <svg id="chartSvg" viewBox="0 0 340 236" role="img"></svg>
+            <svg class="plot" id="chartSvg" viewBox="0 0 340 236" role="img"></svg>
             <div class="chart-tip" id="chartTip" hidden></div>
             <p class="chart-empty" id="chartEmpty" data-i18n="chartEmpty">Kjør en test for å se grafen.</p>
+          </div>
+          <div class="chart" id="covWrap" hidden>
+            <p class="chart-head"><span id="covPhase">Dekning</span><b id="covNow">–</b></p>
+            <div class="chart-legend" aria-hidden="true">
+              <span><i class="sw-down"></i><span data-i18n="down">Ned</span></span>
+              <span><i class="sw-idle"></i><span data-i18n="ping">Ping</span></span>
+              <span><i class="sw-lost"></i><span data-i18n="lostPing">Tapt ping</span></span>
+            </div>
+            <svg class="plot" id="covSvg" viewBox="0 0 340 236" role="img"></svg>
+            <p class="chart-empty" id="covEmpty" data-i18n="covEmpty">Trykk «Start kartlegging» og gå rolig rundt i huset.</p>
+            <p class="cov-meta" id="covMeta"></p>
           </div>
           <svg class="gauge" id="gauge" viewBox="0 0 300 246" role="img" aria-labelledby="gaugeTxt">
             <title id="gaugeTxt">Fartsmåler</title>
@@ -298,8 +342,19 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
           <button class="start" id="startBtn" type="button"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><span id="startTxt">Start test</span></button>
           <p class="where"><span data-i18n="server">Server</span><span id="where">–</span></p>
         </div>
+        <div class="cov-tools" id="covTools" hidden>
+          <p class="field-help" data-i18n="covHelp">Nettleseren kan ikke lese Wi‑Fi-signalet direkte, så appen måler fart og ping hele tiden mens du går rundt. Stopp noen sekunder på hvert sted og trykk «Merk sted». Farten måles med korte prøver og blir lavere enn i hele testen; den er til å sammenligne steder. Med «Spar data» på måles bare ping.</p>
+          <div class="cov-mark">
+            <input id="spotName" maxlength="30" autocomplete="off" data-i18n-aria="spotPlaceholder" placeholder="Hvor er du? F.eks. Stue">
+            <button class="secondary-button" id="markBtn" type="button" data-i18n="markSpot" disabled>Merk sted</button>
+          </div>
+          <div class="chips" id="spotChips"></div>
+          <div class="spots-head" id="spotsHead" hidden><h3 data-i18n="spotsTitle">Steder</h3><button class="text-button" id="spotsClear" type="button" data-i18n="spotsClear">Tøm steder</button></div>
+          <ul class="spots" id="spots"></ul>
+          <p class="cov-summary" id="covSummary"></p>
+        </div>
         <label class="switch-row"><span><strong data-i18n="saverTitle">Spar data</strong><small data-i18n="saverHelp">Stopper ved rundt 250 MB ned og 100 MB opp. Raske linjer kan da måles litt lavere.</small></span><input id="saverIn" type="checkbox" role="switch"><span class="switch-track" aria-hidden="true"></span></label>
-        <p class="field-help" data-i18n="runHelp">Testen bruker fire tilkoblinger samtidig i 8 sekunder hver vei. Uten «Spar data» kan den bruke rundt 1 GB hver vei på en gigabit-linje.</p>
+        <p class="field-help" id="runHelp" data-i18n="runHelp">Testen bruker fire tilkoblinger samtidig i 8 sekunder hver vei. Uten «Spar data» kan den bruke rundt 1 GB hver vei på en gigabit-linje.</p>
       </section>
 
       <section class="panel" aria-labelledby="resTitle">
@@ -360,9 +415,9 @@ footer{background:var(--navy);color:#a6b6c6;padding-bottom:var(--bottom)}
   </section>
 </main>
 
-<footer><div class="shell footer-inner"><span>&copy; <span id="year">2026</span> Cloud247</span><span class="footer-version">Nettfart <span id="verTxt">v1.5.2</span></span><a href="https://cloud247.no/">cloud247.no <span aria-hidden="true">&nearr;</span></a></div></footer>
+<footer><div class="shell footer-inner"><span>&copy; <span id="year">2026</span> Cloud247</span><span class="footer-version">Nettfart <span id="verTxt">v1.6.0</span></span><a href="https://cloud247.no/">cloud247.no <span aria-hidden="true">&nearr;</span></a></div></footer>
 
-<script src="i18n.js?v=1.5.2"></script>
-<script src="app.js?v=1.5.2"></script>
+<script src="i18n.js?v=1.6.0"></script>
+<script src="app.js?v=1.6.0"></script>
 </body>
 </html>
