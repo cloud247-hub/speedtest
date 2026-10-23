@@ -125,9 +125,12 @@ async function ping(signal) {
   return Math.max(0, ttfb - serverTime(res, e));
 }
 
+// carries the HTTP status, so a 429 (Cloudflare rate-limiting the test) can be told apart from a network problem
+const httpError = res => Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+
 async function fetchDown(size, add, signal) {
   const res = await fetch(`${SPEED}/__down?bytes=${size}&r=${rnd()}`, { cache: "no-store", signal });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw httpError(res);
   const rd = res.body.getReader();
   for (;;) {
     const { done, value } = await rd.read();
@@ -143,7 +146,7 @@ async function fetchUp(size, add, signal) {
   const started = performance.now();
   const res = await fetch(`${SPEED}/__up?r=${rnd()}`, { method: "POST", body: blobs[size] ||= new Blob([new Uint8Array(size)]), cache: "no-store", signal });
   await res.arrayBuffer();
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw httpError(res);
   add(size, started);
 }
 
@@ -153,7 +156,7 @@ async function fetchUp(size, add, signal) {
 async function throughput(dir, signal, { capped, onTick, onPing }) {
   const ctrl = new AbortController(), stop = () => ctrl.abort();
   signal.addEventListener("abort", stop);
-  let total = 0, errors = 0, closing = false, drainTimer;
+  let total = 0, errors = 0, limited = 0, closing = false, drainTimer;
   // Download counts bytes as they arrive, so it can stop at once. Upload chunks only count when done, so
   // aborting them would drop bytes already sent: let the ones in flight finish (up to 4 s) instead.
   const finish = () => {
@@ -168,17 +171,21 @@ async function throughput(dir, signal, { capped, onTick, onPing }) {
     if (capped && total >= CAP[dir]) finish();
   };
 
+  // A failed request never ends the phase: the stream backs off (0.25 → 2 s), starts over with small chunks
+  // and keeps going until the time is up. Rate-limiting (429) is counted apart from real errors.
   const stream = async () => {
-    let size = START[dir];
+    let size = START[dir], fails = 0;
     while (!ctrl.signal.aborted && !closing) {
       const started = performance.now();
       try { await (dir === "down" ? fetchDown : fetchUp)(size, add, ctrl.signal); }
       catch (e) {
         if (ctrl.signal.aborted) break;
-        if (++errors > 8) { stop(); break; }
-        await sleep(250, ctrl.signal);
+        if (e.status === 429) limited++; else errors++;
+        size = START[dir];
+        await sleep(Math.min(2000, 250 * 2 ** fails++), ctrl.signal);
         continue;
       }
+      fails = 0;
       if (performance.now() - started < GROW_MS[dir]) size = Math.min(size * 2, MAX[dir]);
     }
   };
@@ -206,7 +213,7 @@ async function throughput(dir, signal, { capped, onTick, onPing }) {
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
 
   const end = performance.now() - t0;
-  if (!total) throw new Error(t(dir === "down" ? "errNoDown" : "errNoUp"));
+  if (!total) throw Object.assign(new Error(t(dir === "down" ? "errNoDown" : "errNoUp")), { status: limited ? 429 : undefined });
   samples.push([end, total]);
   // Bytes moved between two moments. Download: interpolated from the 100 ms samples. Upload: each finished chunk
   // is spread evenly over the time it took (it only counts once it's done).
@@ -225,7 +232,7 @@ async function throughput(dir, signal, { capped, onTick, onPing }) {
   const w = end > WARMUP_MS * 2 ? WARMUP_MS : 0, rates = [];
   for (let time = w + 1000; time <= end; time += 100) rates.push(mbit(between(time - 1000, time), 1000));
   const mbps = rates.length >= 5 ? percentile(rates, .9) : mbit(between(w, end), end - w);
-  return { mbps, bytes: total, loaded: median(loaded), errors };
+  return { mbps, bytes: total, loaded: median(loaded), errors, limited };
 }
 
 async function runTest() {
@@ -235,7 +242,7 @@ async function runTest() {
   setBanner("");
   for (const id of ["sDown", "sUp", "sPing", "sJitter", "sLoaded", "sData"]) $(id).textContent = "–";
   $("grade").hidden = true;
-  const r = { at: Date.now(), conn, plan, saver, bytes: 0, errors: 0 };
+  const r = { at: Date.now(), conn, plan, saver, bytes: 0, errors: 0, limited: 0 };
   const T0 = performance.now(), sec = () => (performance.now() - T0) / 1000;
   series = { phases: {}, down: [], up: [], ping: [] };
   drawChart();
@@ -280,6 +287,7 @@ async function runTest() {
       r[dir === "down" ? "loadedDown" : "loadedUp"] = out.loaded;
       r.bytes += out.bytes;
       r.errors += out.errors;
+      r.limited += out.limited;
       $(dir === "down" ? "sDown" : "sUp").textContent = fmtSpeed(out.mbps);
       $("sData").textContent = fmtMB(r.bytes);
     }
@@ -297,7 +305,7 @@ async function runTest() {
     else {
       // fetch() rejects with a TypeError when the server can't be reached at all (offline, blocked, CORS)
       gauge({ phase: "phFailed" });
-      setBanner(t("errBanner", { msg: e instanceof TypeError ? t("errReach") : e.message || t("errUnknown") }));
+      setBanner(e.status === 429 ? t("errLimited") : t("errBanner", { msg: e instanceof TypeError ? t("errReach") : e.message || t("errUnknown") }));
     }
     if (last) showResult(last, true);
   } finally {
@@ -378,8 +386,10 @@ function drawChart() {
     g += `<path class="line ${dir}" d="${pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${ya(p[1]).toFixed(1)}`).join("")}"/>`;
     const [lx, lv] = pts.at(-1), val = result ? result[dir] : lv;
     const ex = x(lx), ey = ya(lv);
+    // the label sits above the highest point of the line under it (it spans ~30 units left of the end dot)
+    const top = ya(Math.max(...pts.filter(p => x(p[0]) >= ex - 30).map(p => p[1])));
     g += `<circle class="end" cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="4" fill="${COLOR[dir]}"/>`;
-    g += `<text class="endlbl" x="${(ex - 6).toFixed(1)}" y="${(ey < AT + 14 ? ey + 16 : ey - 8).toFixed(1)}" text-anchor="end">${esc(fmtSpeed(val))}</text>`;
+    g += `<text class="endlbl" x="${(ex - 6).toFixed(1)}" y="${(top < AT + 14 ? ey + 16 : top - 8).toFixed(1)}" text-anchor="end">${esc(fmtSpeed(val))}</text>`;
   }
   // ping plot: every ping as a dot, coloured by the phase it was taken in
   for (const v of [0, pMax]) {
@@ -490,6 +500,8 @@ function advise(r) {
   const bloat = bloatOf(r), upBloat = (r.loadedUp || 0) > (r.loadedDown || 0);
   const nordic = ["OSL", "ARN", "CPH", "HEL", "GOT", "BGO", "SVG", "TRD", "KRS", "TOS"];
   let medium = false, ring = false;
+
+  if (r.limited > 0) add("warn", "limitTitle", ["limitWhy", { n: r.limited }], ["limitS1"]);
 
   if (r.errors > 0) {
     add("warn", "errTitle", [r.errors === 1 ? "errWhy1" : "errWhyN", { n: r.errors }], ["errS1", "restart"]);

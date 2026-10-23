@@ -37,6 +37,10 @@
       stBad: "Dårlig", stOk: "Kan hakke", stGood: "Fint",
       tagBad: "Viktig", tagWarn: "Bør fikses", tagFix: "Slik fikser du det", tagTip: "Tips", tagGood: "Alt bra",
 
+      limitTitle: "Cloudflare begrenset testen",
+      limitWhy: "{n} forespørsler ble avvist med «for mange forespørsler» (HTTP 429). Det skjer når det kjøres mange tester fra samme adresse på kort tid, og har ingenting med nettet ditt å gjøre. Resultatet kan bli litt for lavt.",
+      limitS1: "Vent et par minutter og test igjen.",
+      errLimited: "Cloudflare avviste testen fordi det er kjørt mange tester på kort tid (HTTP 429). Vent et par minutter og prøv igjen.",
       errTitle: "Forbindelsen hakket under testen",
       errWhy1: "1 forespørsel feilet underveis. Det tyder på at nettet faller ut et lite øyeblikk, som gir frys i samtaler og strømming.",
       errWhyN: "{n} forespørsler feilet underveis. Det tyder på at nettet faller ut et lite øyeblikk, som gir frys i samtaler og strømming.",
@@ -168,6 +172,10 @@
       stBad: "Poor", stOk: "May stutter", stGood: "Good",
       tagBad: "Important", tagWarn: "Should fix", tagFix: "How to fix it", tagTip: "Tip", tagGood: "All good",
 
+      limitTitle: "Cloudflare limited the test",
+      limitWhy: "{n} requests were refused with «too many requests» (HTTP 429). That happens when many tests run from the same address in a short time, and has nothing to do with your connection. The result may be slightly too low.",
+      limitS1: "Wait a couple of minutes and test again.",
+      errLimited: "Cloudflare refused the test because many tests have run in a short time (HTTP 429). Wait a couple of minutes and try again.",
       errTitle: "The connection dropped during the test",
       errWhy1: "1 request failed along the way. That suggests the connection drops out for a moment, which causes freezes in calls and streaming.",
       errWhyN: "{n} requests failed along the way. That suggests the connection drops out for a moment, which causes freezes in calls and streaming.",
