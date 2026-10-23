@@ -26,9 +26,11 @@ const store = {
 };
 
 // Each direction runs 4 parallel streams for 8 s; the first 1.5 s (TCP warm-up) is left out of the result.
-// The caps stop early on very fast lines so a test on mobile data doesn't eat the quota.
+// Chunks start small and double while they finish quickly. With «Spar data» on, the caps stop a very fast
+// line early so a test on mobile data doesn't eat the quota; off (the default), the full 8 s always run.
 const STREAMS = 4, PHASE_MS = 8000, WARMUP_MS = 1500, PINGS = 16;
-const CAP = { down: 250e6, up: 100e6 }, START = { down: 1e6, up: 128e3 }, MAX = { down: 24e6, up: 8e6 }, GROW_MS = { down: 1500, up: 600 };
+const CAP = { down: 250e6, up: 100e6 };
+const START = { down: 1e6, up: 128e3 }, MAX = { down: 24e6, up: 16e6 }, GROW_MS = { down: 1500, up: 600 };
 const TICKS = [0, 1, 5, 10, 25, 50, 100, 250, 500, 1000];
 // Every request here must stay a CORS "simple request" (GET, or POST of a type-less Blob, no custom headers),
 // so the browser never needs a preflight that the endpoints might not answer.
@@ -37,6 +39,7 @@ const CONN_KEY = { wifi: "connWifi", cable: "connCable", mobile: "connMobile" };
 
 let conn = store.get("nf_conn", null) || ({ wifi: "wifi", ethernet: "cable", cellular: "mobile" })[navigator.connection?.type] || "wifi";
 let plan = store.get("nf_plan", null);
+let saver = store.get("nf_saver", false);
 let running = null, last = null, history = store.get("nf_hist", []);
 try { performance.setResourceTimingBufferSize(500); } catch {}
 
@@ -141,7 +144,7 @@ async function fetchUp(size, add, signal) {
 // One direction: parallel streams that keep asking for bigger chunks until the time (or data cap) is up
 // (upload chunks stay shorter, since they only count once they're done), plus a ping every 300 ms to catch
 // bufferbloat (latency that rises when the line is busy).
-async function throughput(dir, signal, onTick) {
+async function throughput(dir, signal, capped, onTick) {
   const ctrl = new AbortController(), stop = () => ctrl.abort();
   signal.addEventListener("abort", stop);
   let total = 0, errors = 0, closing = false, drainTimer;
@@ -156,7 +159,7 @@ async function throughput(dir, signal, onTick) {
   const add = (n, started) => {
     total += n;
     if (started) chunks.push({ s: started - t0, e: performance.now() - t0, n });
-    if (total >= CAP[dir]) finish();
+    if (capped && total >= CAP[dir]) finish();
   };
 
   const stream = async () => {
@@ -212,7 +215,7 @@ async function throughput(dir, signal, onTick) {
     : (a, b) => at(b) - at(a);
   // Result: 90th percentile of the one-second rates after the warm-up, like Cloudflare's 90th percentile per
   // request. Wi‑Fi dips and the pauses between requests don't drag it down, and no single burst decides it.
-  // Fast lines hit the cap before the warm-up is over; then the whole run counts.
+  // A run that hit the data cap (or errors) before the warm-up was over counts as a whole.
   const w = end > WARMUP_MS * 2 ? WARMUP_MS : 0, rates = [];
   for (let time = w + 1000; time <= end; time += 100) rates.push(mbit(between(time - 1000, time), 1000));
   const mbps = rates.length >= 5 ? percentile(rates, .9) : mbit(between(w, end), end - w);
@@ -226,7 +229,7 @@ async function runTest() {
   setBanner("");
   for (const id of ["sDown", "sUp", "sPing", "sJitter", "sLoaded", "sData"]) $(id).textContent = "–";
   $("grade").hidden = true;
-  const r = { at: Date.now(), conn, plan, bytes: 0, errors: 0 };
+  const r = { at: Date.now(), conn, plan, saver, bytes: 0, errors: 0 };
 
   try {
     // 1. ping and jitter on an idle line (first request warms up the connection and isn't counted)
@@ -249,7 +252,7 @@ async function runTest() {
 
     // 2. download, 3. upload
     for (const [dir, phase, base] of [["down", "phDown", .1], ["up", "phUp", .55]]) {
-      const out = await throughput(dir, ctrl.signal, (live, f) => {
+      const out = await throughput(dir, ctrl.signal, r.saver, (live, f) => {
         gauge({ num: live, speed: live, phase, dir });
         $(dir === "down" ? "sDown" : "sUp").textContent = fmtSpeed(live);
         progress(base + .45 * Math.min(1, f));
@@ -285,6 +288,7 @@ function setRunning(on) {
   $("startBtn").classList.toggle("stop", on);
   $("startTxt").textContent = t(on ? "cancel" : last ? "testAgain" : "startTest");
   $("startBtn").querySelector("svg").toggleAttribute("hidden", on);
+  $("saverIn").disabled = on;
   $("shareBtn").hidden = on || !last;
 }
 const setBanner = text => { $("banner").textContent = text; $("banner").hidden = !text; };
@@ -468,6 +472,9 @@ function setConn(c) {
   renderAdvice();
 }
 $("connSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setConn(b.dataset.conn); });
+
+$("saverIn").checked = saver;
+$("saverIn").addEventListener("change", () => { saver = $("saverIn").checked; store.set("nf_saver", saver); });
 
 $("planIn").value = plan || "";
 $("planIn").addEventListener("input", () => {
