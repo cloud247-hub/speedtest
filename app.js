@@ -14,6 +14,15 @@ const percentile = (vals, p) => {
   const s = [...vals].sort((x, y) => x - y), i = (s.length - 1) * p, lo = Math.floor(i);
   return s.length ? s[lo] + (s[Math.ceil(i)] - s[lo]) * (i - lo) : null;
 };
+// Jitter: the mean change between consecutive pings, leaving out the largest fifth of the changes, so a single
+// spike (a phone waking its Wi‑Fi radio from power saving) doesn't make a steady line look shaky; jitter that's
+// really there still shows.
+const jitterOf = ps => {
+  if (ps.length < 2) return null;
+  const d = ps.slice(1).map((v, i) => Math.abs(v - ps[i])).sort((a, b) => a - b);
+  const keep = d.slice(0, Math.max(1, Math.ceil(d.length * .8)));
+  return keep.reduce((a, v) => a + v, 0) / keep.length;
+};
 const median = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : null; };
 const mbit = (bytes, ms) => ms > 0 ? bytes * 8 / (ms / 1000) / 1e6 : 0;
 const locale = () => Cloud247I18n.getLanguage() === "en" ? "en-GB" : "nb-NO";
@@ -157,6 +166,7 @@ async function throughput(dir, signal, { capped, onTick, onPing }) {
   const ctrl = new AbortController(), stop = () => ctrl.abort();
   signal.addEventListener("abort", stop);
   let total = 0, errors = 0, limited = 0, closing = false, drainTimer;
+  const kinds = {};  // what the failures were (HTTP status or error name), kept with the result to find the cause
   // Download counts bytes as they arrive, so it can stop at once. Upload chunks only count when done, so
   // aborting them would drop bytes already sent: let the ones in flight finish (up to 4 s) instead.
   const finish = () => {
@@ -181,6 +191,8 @@ async function throughput(dir, signal, { capped, onTick, onPing }) {
       catch (e) {
         if (ctrl.signal.aborted) break;
         if (e.status === 429) limited++; else errors++;
+        const kind = e.status ? `HTTP ${e.status}` : `${dir === "down" ? "↓" : "↑"} ${e.name || "Error"}`;
+        kinds[kind] = (kinds[kind] || 0) + 1;
         size = START[dir];
         await sleep(Math.min(2000, 250 * 2 ** fails++), ctrl.signal);
         continue;
@@ -232,7 +244,7 @@ async function throughput(dir, signal, { capped, onTick, onPing }) {
   const w = end > WARMUP_MS * 2 ? WARMUP_MS : 0, rates = [];
   for (let time = w + 1000; time <= end; time += 100) rates.push(mbit(between(time - 1000, time), 1000));
   const mbps = rates.length >= 5 ? percentile(rates, .9) : mbit(between(w, end), end - w);
-  return { mbps, bytes: total, loaded: median(loaded), errors, limited };
+  return { mbps, bytes: total, loaded: median(loaded), errors, limited, kinds };
 }
 
 async function runTest() {
@@ -243,7 +255,7 @@ async function runTest() {
   setBanner("");
   for (const id of ["sDown", "sUp", "sPing", "sJitter", "sLoaded", "sData"]) $(id).textContent = "–";
   $("grade").hidden = true;
-  const r = { at: Date.now(), conn, plan, saver, bytes: 0, errors: 0, limited: 0 };
+  const r = { at: Date.now(), conn, plan, saver, bytes: 0, errors: 0, limited: 0, errKinds: {} };
   const T0 = performance.now(), sec = () => (performance.now() - T0) / 1000;
   series = { phases: {}, down: [], up: [], ping: [] };
   drawChart();
@@ -263,7 +275,7 @@ async function runTest() {
       progress(.1 * (i + 1) / PINGS);
     }
     r.ping = median(pings);
-    r.jitter = pings.slice(1).reduce((s, v, i) => s + Math.abs(v - pings[i]), 0) / (pings.length - 1);
+    r.jitter = jitterOf(pings);
     $("sJitter").textContent = fmtMs(r.jitter);
     Object.assign(r, server);
     showWhere(r);
@@ -289,6 +301,7 @@ async function runTest() {
       r.bytes += out.bytes;
       r.errors += out.errors;
       r.limited += out.limited;
+      for (const [k, n] of Object.entries(out.kinds)) r.errKinds[k] = (r.errKinds[k] || 0) + n;
       $(dir === "down" ? "sDown" : "sUp").textContent = fmtSpeed(out.mbps);
       $("sData").textContent = fmtMB(r.bytes);
     }
@@ -537,7 +550,7 @@ document.addEventListener("visibilitychange", async () => {
 function recent(c, secs) {
   const end = c.pts.at(-1)?.[0] ?? 0, pts = c.pts.filter(p => p[0] >= end - secs);
   const pings = pts.map(p => p[2]).filter(v => v != null), speeds = pts.map(p => p[1]).filter(v => v != null);
-  const jitter = pings.length > 1 ? pings.slice(1).reduce((a, v, i) => a + Math.abs(v - pings[i]), 0) / (pings.length - 1) : null;
+  const jitter = jitterOf(pings);
   return { n: pings.length, down: speeds.length ? median(speeds) : null, ping: median(pings), jitter, loss: pts.length ? pts.filter(p => p[2] == null).length / pts.length : 0 };
 }
 // 3 excellent, 2 good, 1 weak, 0 poor
@@ -706,7 +719,7 @@ function renderUses(r) {
 // (Wi‑Fi / mobile) with the fixes that help almost every problem there, so they aren't repeated on every card.
 // Cards hold message keys (plus values for the placeholders), so they follow the chosen language.
 function advise(r) {
-  const out = [], add = (level, title, why, steps = []) => out.push({ level, title, why, steps });
+  const out = [], add = (level, title, why, steps = [], note = "") => out.push({ level, title, why, steps, note });
   const wifi = r.conn === "wifi", cable = r.conn === "cable", mobile = r.conn === "mobile";
   const bloat = bloatOf(r), upBloat = (r.loadedUp || 0) > (r.loadedDown || 0);
   const nordic = ["OSL", "ARN", "CPH", "HEL", "GOT", "BGO", "SVG", "TRD", "KRS", "TOS"];
@@ -757,7 +770,8 @@ function advise(r) {
   // Failed requests alone don't prove a bad connection: a rate-limited Cloudflare answer without CORS headers
   // looks just like a network error to the browser. Only mention them when something else points to trouble too.
   if (r.errors > 0 && out.some(s => s.level === "bad" || s.level === "warn"))
-    add("warn", "errTitle", [r.errors === 1 ? "errWhy1" : "errWhyN", { n: r.errors }], ["errS1", "restart"]);
+    add("warn", "errTitle", [r.errors === 1 ? "errWhy1" : "errWhyN", { n: r.errors }], ["errS1", "restart"],
+      Object.entries(r.errKinds || {}).map(([k, n]) => `${k} × ${n}`).join(", "));
 
   // fixes for the medium itself
   if (medium && wifi) add("fix", "wifiTitle", "wifiWhy", ["wifi1", "wifi2", "wifi3", "wifi4", "restartRouter", "wifi5"]);
@@ -796,6 +810,7 @@ function renderAdvice() {
       <summary><span class="tag">${esc(t(tags[s.level]))}</span><h3>${esc(msg(s.title))}</h3><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
       <div class="sug-body">
         <p>${esc(msg(s.why))}</p>
+        ${s.note ? `<p class="sug-note">${esc(t("errKinds", { list: s.note }))}</p>` : ""}
         ${s.steps.length ? `<ol>${s.steps.map(step => `<li><span>${esc(msg(step))}</span></li>`).join("")}</ol>` : ""}
       </div>
     </details>`).join("");

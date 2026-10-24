@@ -50,6 +50,7 @@
       errTitle: "Forbindelsen hakket under testen",
       errWhy1: "1 forespørsel feilet underveis. Det kan være at nettet faller ut et lite øyeblikk, som gir frys i samtaler og strømming, eller at Cloudflare begrenser testen etter mange tester på kort tid.",
       errWhyN: "{n} forespørsler feilet underveis. Det kan være at nettet faller ut et lite øyeblikk, som gir frys i samtaler og strømming, eller at Cloudflare begrenser testen etter mange tester på kort tid.",
+      errKinds: "Feiltype: {list}",
       errS1: "Kjør testen igjen. Skjer det ofte, noter klokkeslettene.",
       restart: "Restart ruteren og modemet: trekk ut strømmen i 30 sekunder.",
 
@@ -186,6 +187,7 @@
       errTitle: "The connection dropped during the test",
       errWhy1: "1 request failed along the way. The connection may drop out for a moment, which causes freezes in calls and streaming, or Cloudflare may be limiting the test after many tests in a short time.",
       errWhyN: "{n} requests failed along the way. The connection may drop out for a moment, which causes freezes in calls and streaming, or Cloudflare may be limiting the test after many tests in a short time.",
+      errKinds: "Error type: {list}",
       errS1: "Run the test again. If it happens often, note the times.",
       restart: "Restart the router and modem: unplug the power for 30 seconds.",
 
