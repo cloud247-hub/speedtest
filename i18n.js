@@ -28,7 +28,7 @@
       plan: "Abonnement", planHelp: "Valgfritt: hva leverandøren lover",
       copyResult: "Kopier resultat", copied: "Kopiert ✓",
       usage: "BRUK", usesTitle: "Hva holder nettet til?",
-      suggestions: "FORSLAG", sugTitle: "Forslag", sugTitleN: "Forslag til fiks · {n} funn",
+      suggestions: "FORSLAG", sugTitle: "Alt ser bra ut", sugTitleN: "Forslag til fiks · {n} funn",
       history: "HISTORIKK", histTitle: "Tidligere tester", histClear: "Tøm historikken", histLocal: "Lagres bare på denne enheten.",
       histDown: "ned", histUp: "opp", confirmClear: "Slette alle tidligere tester på denne enheten?",
       moreTitle: "Flere gratis verktøy", moreText: "Sjekk domenet, e-posten og Microsoft-miljøet ditt.", moreButton: "Til Cloud Toolbox",
@@ -48,8 +48,8 @@
       limitS1: "Vent et par minutter og test igjen.",
       errLimited: "Cloudflare avviste testen fordi det er kjørt mange tester på kort tid (HTTP 429). Vent et par minutter og prøv igjen.",
       errTitle: "Forbindelsen hakket under testen",
-      errWhy1: "1 forespørsel feilet underveis. Det tyder på at nettet faller ut et lite øyeblikk, som gir frys i samtaler og strømming.",
-      errWhyN: "{n} forespørsler feilet underveis. Det tyder på at nettet faller ut et lite øyeblikk, som gir frys i samtaler og strømming.",
+      errWhy1: "1 forespørsel feilet underveis. Det kan være at nettet faller ut et lite øyeblikk, som gir frys i samtaler og strømming, eller at Cloudflare begrenser testen etter mange tester på kort tid.",
+      errWhyN: "{n} forespørsler feilet underveis. Det kan være at nettet faller ut et lite øyeblikk, som gir frys i samtaler og strømming, eller at Cloudflare begrenser testen etter mange tester på kort tid.",
       errS1: "Kjør testen igjen. Skjer det ofte, noter klokkeslettene.",
       restart: "Restart ruteren og modemet: trekk ut strømmen i 30 sekunder.",
 
@@ -103,10 +103,6 @@
       upPlan: "Mange abonnement har mye lavere opplasting enn nedlasting, særlig ADSL og kabel-TV-nett. Sjekk hva abonnementet ditt lover for opplasting.",
       upWifi: "Svakt Wi‑Fi rammer opplasting hardest, fordi telefonen sender svakere enn ruteren. Gå nærmere ruteren.",
 
-      httpTitle: "Tilkoblingen går via en mellomstasjon",
-      httpWhy: "Nettleseren brukte den gamle protokollen HTTP/1.1. Det skjer ofte når antivirus med «HTTPS-skanning», en VPN eller en firmaproxy leser trafikken, og det kan gjøre nettet tregere.",
-      httpS1: "Slå av HTTPS- eller webskanning i antivirusprogrammet, og test igjen.",
-      httpS2: "Test uten VPN.",
 
       wifiTitle: "Slik får du bedre Wi‑Fi",
       wifiWhy: "Svakt eller forstyrret Wi‑Fi er den vanligste årsaken til tregt nett hjemme.",
@@ -135,7 +131,6 @@
 
       goodTitle: "Nettet ditt er i god form",
       goodWhy: "Fart, ping og stabilitet ser bra ut. Ingen ting å fikse.",
-      goodEvening: "Test gjerne igjen på kvelden (kl. 19–23). Da er nettet mest belastet.",
       goodCable: "Vil du se hva linja klarer uten Wi‑Fi, test med kabel rett i ruteren.",
       goodPlan: "Fyll inn hva abonnementet ditt lover, så sjekker appen om du får det du betaler for.",
 
@@ -169,7 +164,7 @@
       plan: "Your plan", planHelp: "Optional: what your provider promises",
       copyResult: "Copy result", copied: "Copied ✓",
       usage: "USAGE", usesTitle: "What can your connection handle?",
-      suggestions: "SUGGESTIONS", sugTitle: "Suggestions", sugTitleN: "Suggested fixes · {n} found",
+      suggestions: "SUGGESTIONS", sugTitle: "All good", sugTitleN: "Suggested fixes · {n} found",
       history: "HISTORY", histTitle: "Previous tests", histClear: "Clear history", histLocal: "Stored only on this device.",
       histDown: "down", histUp: "up", confirmClear: "Delete all previous tests on this device?",
       moreTitle: "More free tools", moreText: "Check your domain, email and Microsoft environment.", moreButton: "Go to Cloud Toolbox",
@@ -189,8 +184,8 @@
       limitS1: "Wait a couple of minutes and test again.",
       errLimited: "Cloudflare refused the test because many tests have run in a short time (HTTP 429). Wait a couple of minutes and try again.",
       errTitle: "The connection dropped during the test",
-      errWhy1: "1 request failed along the way. That suggests the connection drops out for a moment, which causes freezes in calls and streaming.",
-      errWhyN: "{n} requests failed along the way. That suggests the connection drops out for a moment, which causes freezes in calls and streaming.",
+      errWhy1: "1 request failed along the way. The connection may drop out for a moment, which causes freezes in calls and streaming, or Cloudflare may be limiting the test after many tests in a short time.",
+      errWhyN: "{n} requests failed along the way. The connection may drop out for a moment, which causes freezes in calls and streaming, or Cloudflare may be limiting the test after many tests in a short time.",
       errS1: "Run the test again. If it happens often, note the times.",
       restart: "Restart the router and modem: unplug the power for 30 seconds.",
 
@@ -244,10 +239,6 @@
       upPlan: "Many plans have much lower upload than download, especially ADSL and cable-TV networks. Check what your plan promises for upload.",
       upWifi: "Weak Wi‑Fi hits upload hardest, because the phone transmits more weakly than the router. Move closer to the router.",
 
-      httpTitle: "The connection goes through a middleman",
-      httpWhy: "The browser used the old HTTP/1.1 protocol. That often happens when antivirus «HTTPS scanning», a VPN or a company proxy reads the traffic, and it can make the connection slower.",
-      httpS1: "Turn off HTTPS or web scanning in your antivirus, and test again.",
-      httpS2: "Test without VPN.",
 
       wifiTitle: "How to get better Wi‑Fi",
       wifiWhy: "Weak or disturbed Wi‑Fi is the most common cause of a slow connection at home.",
@@ -276,7 +267,6 @@
 
       goodTitle: "Your connection is in good shape",
       goodWhy: "Speed, ping and stability look good. Nothing to fix.",
-      goodEvening: "Test again in the evening (7–11 pm) if you like. That's when networks are busiest.",
       goodCable: "To see what the line can do without Wi‑Fi, test with a cable straight into the router.",
       goodPlan: "Enter what your plan promises, and the app checks whether you get what you pay for.",
 

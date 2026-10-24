@@ -16,6 +16,9 @@ Speedtest fra Cloud247 (Cloud Toolbox). Statisk side på **GitHub Pages**. UI-et
 ## Regler
 
 - Alle kall til speed.cloudflare.com må være enkle CORS-forespørsler: GET, eller POST av en `Blob` uten type, uten egne headere og uten lyttere på `xhr.upload`. Ellers sender nettleseren en preflight som endepunktene ikke er laget for.
+- speed.cloudflare.com svarer med HTTP/1.1 (også uten proxy/antivirus), så HTTP-versjonen sier ingenting om brukerens nett og skal ikke gi forslag.
+- Cloudflares 429-svar mangler trolig CORS og ser ut som nettverksfeil i nettleseren. Feilede forespørsler skal derfor bare nevnes når andre målinger også viser problemer.
+- Godt resultat = ingen fikser. «Alt ser bra ut» viser bare tips som faktisk er nye for brukeren.
 - Nye eksterne adresser må også inn i `connect-src` i CSP-en i `index.html`.
 - Alle stier skal være relative (siden kan ligge under `/speedtest/`).
 - Kun gratis tjenester. Ingen secrets, ingen database, ingen byggesteg.

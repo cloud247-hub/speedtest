@@ -714,11 +714,6 @@ function advise(r) {
 
   if (r.limited > 0) add("warn", "limitTitle", ["limitWhy", { n: r.limited }], ["limitS1"]);
 
-  if (r.errors > 0) {
-    add("warn", "errTitle", [r.errors === 1 ? "errWhy1" : "errWhyN", { n: r.errors }], ["errS1", "restart"]);
-    medium = true;
-  }
-
   const pct = r.plan ? r.down / r.plan : 1;
   if (r.plan && cable && r.plan > 100 && r.down >= 80 && r.down <= 97) {
     add("bad", "capTitle", ["capWhy", { plan: r.plan }], ["capS1", "capS2", "capS3", "capS4"]);
@@ -759,7 +754,10 @@ function advise(r) {
     medium = true;
   }
 
-  if (r.http === "HTTP/1.1") add("tip", "httpTitle", "httpWhy", ["httpS1", "httpS2"]);
+  // Failed requests alone don't prove a bad connection: a rate-limited Cloudflare answer without CORS headers
+  // looks just like a network error to the browser. Only mention them when something else points to trouble too.
+  if (r.errors > 0 && out.some(s => s.level === "bad" || s.level === "warn"))
+    add("warn", "errTitle", [r.errors === 1 ? "errWhy1" : "errWhyN", { n: r.errors }], ["errS1", "restart"]);
 
   // fixes for the medium itself
   if (medium && wifi) add("fix", "wifiTitle", "wifiWhy", ["wifi1", "wifi2", "wifi3", "wifi4", "restartRouter", "wifi5"]);
@@ -770,9 +768,10 @@ function advise(r) {
   }
 
   if (!out.some(s => s.level === "bad" || s.level === "warn")) {
-    const steps = ["goodEvening"];
-    if (wifi) steps.push("goodCable");
+    // a good result needs no fixes; only a tip that can still tell the user something new
+    const steps = [];
     if (!r.plan) steps.push("goodPlan");
+    else if (wifi && r.down < r.plan * .8) steps.push("goodCable");
     out.unshift({ level: "good", title: "goodTitle", why: "goodWhy", steps });
   }
   const order = { bad: 0, warn: 1, good: 2, fix: 3, tip: 4 };
